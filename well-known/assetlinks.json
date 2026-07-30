@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "io.github.alielref9_droid.twa",
+    "sha256_cert_fingerprints": ["30:67:AD:21:F1:DC:2E:D0:DC:61:98:41:97:32:7F:97:7C:E0:61:73:43:87:39:4F:A4:97:A2:76:81:D5:7D:49"]
+  }
+}]
