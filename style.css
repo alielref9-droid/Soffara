@@ -290,6 +290,56 @@ html[data-theme="night"] .nav-btn.active { color: var(--gold); }
   color: var(--pitch-dark); font-weight: 800; font-size: 12px; padding: 5px 10px; border-radius: 999px;
 }
 .empty-state { text-align: center; color: var(--ink-soft); padding: 40px 10px; font-size: 14px; }
+
+/* Crew (members) list */
+.crew-row {
+  display: flex; align-items: center; gap: 12px; background: var(--card);
+  border-radius: 14px; padding: 10px 14px; margin-bottom: 10px; box-shadow: var(--shadow);
+  cursor: pointer;
+}
+.crew-row .avatar-img, .crew-row .avatar-fallback { width: 44px; height: 44px; flex-shrink: 0; }
+.crew-row-name { font-weight: 800; font-size: 14.5px; }
+.crew-row-meta { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+
+/* Member profile viewer */
+.profile-view-head { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 16px; }
+.profile-view-head .avatar-img, .profile-view-head .avatar-fallback { width: 84px; height: 84px; font-size: 30px; }
+.profile-view-name { font-family: var(--font-display); font-weight: 800; font-size: 19px; }
+.profile-view-admin {
+  background: var(--gold); color: var(--pitch-dark); font-weight: 800; font-size: 11.5px;
+  padding: 3px 10px; border-radius: 999px;
+}
+.profile-view-rows { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.profile-view-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--chalk); border-radius: 12px; padding: 10px 14px;
+}
+.profile-view-row .label { font-size: 12px; color: var(--ink-soft); font-weight: 700; }
+.profile-view-row .value { font-size: 14px; font-weight: 700; }
+.profile-view-row a.value { color: var(--pitch-dark); text-decoration: none; }
+html[data-theme="night"] .profile-view-row a.value { color: var(--gold); }
+
+/* Reply preview + swiped message */
+.reply-preview {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--card); border-inline-start: 4px solid var(--gold);
+  border-radius: 10px; padding: 8px 12px; margin-bottom: 6px;
+}
+.reply-preview.hidden { display: none; }
+.reply-preview-name { font-size: 12px; font-weight: 800; color: var(--pitch-dark); }
+html[data-theme="night"] .reply-preview-name { color: var(--gold); }
+.reply-preview-text { font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+#replyPreviewCancel { background: none; border: none; font-size: 15px; color: var(--ink-soft); cursor: pointer; }
+.msg-with-avatar { touch-action: pan-y; }
+.msg-quote {
+  border-inline-start: 3px solid var(--gold); background: rgba(232,178,61,0.12);
+  border-radius: 8px; padding: 4px 8px; margin-bottom: 4px; font-size: 12px;
+}
+.msg-quote .qname { font-weight: 800; color: var(--pitch-dark); }
+html[data-theme="night"] .msg-quote .qname { color: var(--gold); }
+.msg-quote .qtext { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 200px; }
+.msg-with-avatar.mine .msg-bubble .msg-quote { background: rgba(244,241,232,0.15); }
+.msg-with-avatar.mine .msg-bubble .msg-quote .qname { color: var(--gold); }
 .toast {
   position: fixed; bottom: 100px; inset-inline: 0; margin: 0 auto; max-width: 400px;
   background: var(--ink); color: var(--chalk); padding: 11px 18px; border-radius: 12px;

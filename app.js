@@ -138,6 +138,19 @@ const CUSTOM_COLOR_MAP = {
   customTextColor: "--ink",
   customAccentColor: "--gold",
 };
+function hexToRgba(hex, alpha) {
+  const h = String(hex).replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+function applyCustomColor(inputId, val) {
+  document.documentElement.style.setProperty(CUSTOM_COLOR_MAP[inputId], val);
+  if (inputId === "customTextColor") {
+    document.documentElement.style.setProperty("--ink-soft", hexToRgba(val, 0.62));
+  }
+}
 function applyTheme(name) {
   document.documentElement.setAttribute("data-theme", name === "custom" ? "pitch" : name);
   localStorage.setItem("soffara_theme", name);
@@ -149,10 +162,11 @@ function applyTheme(name) {
     const cssVar = CUSTOM_COLOR_MAP[inputId];
     if (name === "custom") {
       const saved = localStorage.getItem(`soffara_custom_${inputId}`) || $(inputId).value;
-      document.documentElement.style.setProperty(cssVar, saved);
+      applyCustomColor(inputId, saved);
       $(inputId).value = saved;
     } else {
       document.documentElement.style.removeProperty(cssVar);
+      if (inputId === "customTextColor") document.documentElement.style.removeProperty("--ink-soft");
     }
   });
 }
@@ -163,13 +177,13 @@ Object.keys(CUSTOM_COLOR_MAP).forEach((inputId) => {
   $(inputId).addEventListener("input", (e) => {
     const val = e.target.value;
     localStorage.setItem(`soffara_custom_${inputId}`, val);
-    document.documentElement.style.setProperty(CUSTOM_COLOR_MAP[inputId], val);
+    applyCustomColor(inputId, val);
   });
 });
 
 // ---------- tabs ----------
 function showView(name) {
-  ["bookings", "chat", "settings"].forEach((v) => {
+  ["bookings", "chat", "crew", "settings"].forEach((v) => {
     $(`view-${v}`).classList.toggle("hidden", v !== name);
   });
   document.querySelectorAll(".nav-btn").forEach((b) => {
@@ -465,8 +479,52 @@ function avatarHtml(p, sizeClass) {
 }
 
 // ============================================================
-// Bookings + voting
+// Crew directory + member profile viewer
 // ============================================================
+let crewCache = [];
+function renderCrew() {
+  const list = $("crewList");
+  if (!crewCache.length) {
+    list.innerHTML = `<div class="empty-state">${t("emptyCrew")}</div>`;
+    return;
+  }
+  const dict = window.SOFFARA_I18N[getLang()];
+  list.innerHTML = crewCache.map((p) => {
+    const posText = (p.positions || []).map((k) => dict.positions[k]).join("، ");
+    const lvlText = p.level ? dict.levels[p.level] : "";
+    const meta = [posText, lvlText].filter(Boolean).join(" · ");
+    return `
+      <div class="crew-row" data-member="${p.id}">
+        ${avatarHtml(p, "avatar-img")}
+        <div>
+          <div class="crew-row-name">${escapeHtml(p.name || "?")}</div>
+          ${meta ? `<div class="crew-row-meta">${escapeHtml(meta)}</div>` : ""}
+        </div>
+      </div>`;
+  }).join("");
+  list.querySelectorAll("[data-member]").forEach((row) => {
+    row.addEventListener("click", () => openProfileView(row.dataset.member));
+  });
+}
+async function openProfileView(profileId) {
+  const p = profilesById[profileId] || (await ensureProfileCached(profileId));
+  const dict = window.SOFFARA_I18N[getLang()];
+  $("profileViewAvatar").innerHTML = avatarHtml(p, "avatar-img");
+  $("profileViewName").textContent = p.name || "?";
+  $("profileViewAdminTag").classList.toggle("hidden", !p.is_admin);
+
+  const rows = [];
+  if (p.phone) rows.push(`<div class="profile-view-row"><span class="label">${t("phoneLabel")}</span><a class="value" href="tel:${p.phone}">${escapeHtml(p.phone)}</a></div>`);
+  if (p.whatsapp) rows.push(`<div class="profile-view-row"><span class="label">${t("whatsappLabel")}</span><a class="value" href="https://wa.me/${p.whatsapp.replace(/[^\d]/g, "")}" target="_blank" rel="noopener">${escapeHtml(p.whatsapp)}</a></div>`);
+  if (p.positions && p.positions.length) rows.push(`<div class="profile-view-row"><span class="label">${t("positionsLabel")}</span><span class="value">${p.positions.map((k) => dict.positions[k]).join("، ")}</span></div>`);
+  if (p.level) rows.push(`<div class="profile-view-row"><span class="label">${t("levelLabel")}</span><span class="value">${dict.levels[p.level]}</span></div>`);
+  $("profileViewRows").innerHTML = rows.join("") || `<div class="empty-state">${t("noProfileInfo")}</div>`;
+
+  $("profileViewOverlay").classList.remove("hidden");
+}
+$("profileViewCloseBtn").addEventListener("click", () => $("profileViewOverlay").classList.add("hidden"));
+
+
 $("openNewBookingBtn").addEventListener("click", () => $("newBookingOverlay").classList.remove("hidden"));
 $("cancelNewBookingBtn").addEventListener("click", () => $("newBookingOverlay").classList.add("hidden"));
 
@@ -626,22 +684,71 @@ function renderMessages(msgs) {
     const mine = m.profile_id === profile.id;
     const p = profilesById[m.profile_id] || { name: "?" };
     const timeStr = d.toLocaleTimeString(getLang() === "ar" ? "ar-EG" : "en-GB", { hour: "2-digit", minute: "2-digit" });
+    const quoteHtml = m.reply_to
+      ? `<div class="msg-quote"><span class="qname">${escapeHtml(m.reply_to.name)}</span><span class="qtext">${escapeHtml(m.reply_to.text)}</span></div>`
+      : "";
     parts.push(`
-      <div class="msg-with-avatar ${mine ? "mine" : ""}">
-        ${avatarHtml(p, "avatar-img")}
+      <div class="msg-with-avatar ${mine ? "mine" : ""}" data-msgid="${m.id}" data-sender="${m.profile_id}" data-sendername="${escapeHtml(p.name || "?")}" data-text="${escapeHtml(m.content)}">
+        <span class="msg-avatar-tap" data-profile-tap="${m.profile_id}">${avatarHtml(p, "avatar-img")}</span>
         <div class="msg-col">
-          <div class="msg-name">${escapeHtml(p.name || "?")}</div>
-          <div class="msg-bubble">${escapeHtml(m.content)}</div>
+          <div class="msg-name" data-profile-tap="${m.profile_id}">${escapeHtml(p.name || "?")}</div>
+          <div class="msg-bubble">${quoteHtml}${escapeHtml(m.content)}</div>
           <div class="msg-time">${timeStr}</div>
         </div>
       </div>`);
   });
   log.innerHTML = parts.join("");
+  log.querySelectorAll("[data-profile-tap]").forEach((el) => {
+    el.addEventListener("click", (e) => { e.stopPropagation(); openProfileView(el.dataset.profileTap); });
+  });
+  setupSwipeToReply(log);
   scrollChatToBottom();
 }
 function scrollChatToBottom() {
   const log = $("chatLog");
   if (log) log.scrollTop = log.scrollHeight;
+}
+
+// ---------- swipe-to-reply ----------
+let replyTarget = null;
+function setReplyTarget(id, name, text) {
+  replyTarget = { id, name, text };
+  $("replyPreviewName").textContent = name;
+  $("replyPreviewText").textContent = text;
+  $("replyPreview").classList.remove("hidden");
+  $("chatInput").focus();
+}
+function clearReplyTarget() {
+  replyTarget = null;
+  $("replyPreview").classList.add("hidden");
+}
+$("replyPreviewCancel").addEventListener("click", clearReplyTarget);
+
+function setupSwipeToReply(log) {
+  log.querySelectorAll(".msg-with-avatar").forEach((el) => {
+    let startX = 0, dx = 0, dragging = false;
+    const threshold = 55;
+    const onDown = (x) => { dragging = true; startX = x; };
+    const onMove = (x) => {
+      if (!dragging) return;
+      dx = x - startX;
+      const clamped = Math.max(-70, Math.min(70, dx));
+      el.style.transform = `translateX(${clamped}px)`;
+    };
+    const onUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      el.style.transform = "";
+      if (Math.abs(dx) > threshold) {
+        setReplyTarget(el.dataset.msgid, el.dataset.sendername, el.dataset.text);
+      }
+      dx = 0;
+    };
+    el.addEventListener("pointerdown", (e) => onDown(e.clientX));
+    el.addEventListener("pointermove", (e) => onMove(e.clientX));
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onUp);
+  });
 }
 async function sendMessage() {
   const input = $("chatInput");
@@ -649,11 +756,16 @@ async function sendMessage() {
   if (!content) return;
   input.value = "";
   clearTyping();
+  const payload = {
+    profile_id: profile.id, content,
+    created_at: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  if (replyTarget) {
+    payload.reply_to = { id: replyTarget.id, name: replyTarget.name, text: replyTarget.text.slice(0, 120) };
+  }
+  clearReplyTarget();
   try {
-    await db.collection("messages").add({
-      profile_id: profile.id, content,
-      created_at: firebase.firestore.FieldValue.serverTimestamp(),
-    });
+    await db.collection("messages").add(payload);
   } catch (err) {
     console.error(err);
     toast(t("toastMsgFailed"));
@@ -692,6 +804,12 @@ function renderTyping(docs) {
 // Realtime listeners
 // ============================================================
 function setupRealtime() {
+  db.collection("profiles").onSnapshot((snap) => {
+    crewCache = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
+    crewCache.forEach((p) => { profilesById[p.id] = p; });
+    renderCrew();
+  }, (err) => console.error(err));
+
   db.collection("bookings").orderBy("match_date", "asc")
     .onSnapshot((snap) => {
       bookingsCache = snap.docs.map((d) => ({ id: d.id, ...d.data() }));

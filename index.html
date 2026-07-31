@@ -40,11 +40,24 @@
       <div class="section-title" data-i18n="sectionChat">دردشة الشلة</div>
       <div class="chat-log" id="chatLog"></div>
       <div class="typing-indicator hidden" id="typingIndicator"></div>
+      <div class="reply-preview hidden" id="replyPreview">
+        <div class="reply-preview-line">
+          <div class="reply-preview-name" id="replyPreviewName"></div>
+          <div class="reply-preview-text" id="replyPreviewText"></div>
+        </div>
+        <button id="replyPreviewCancel">✕</button>
+      </div>
       <div class="chat-input-row">
         <input id="chatInput" type="text" data-i18n-placeholder="chatPlaceholder" placeholder="اكتب رسالة..." maxlength="500">
         <button class="chat-send" id="chatSendBtn">↩</button>
       </div>
     </div>
+  </div>
+
+  <!-- Crew (members directory) view -->
+  <div class="view hidden" id="view-crew">
+    <div class="section-title" data-i18n="sectionCrew">الشلة</div>
+    <div id="crewList"></div>
   </div>
 
   <!-- Settings view -->
@@ -135,6 +148,7 @@
   <div class="bottom-nav">
     <button class="nav-btn active" data-view="bookings"><span class="icon">📋</span><span data-i18n="navBookings">الحجوزات</span></button>
     <button class="nav-btn" data-view="chat"><span class="icon">💬</span><span data-i18n="navChat">الدردشة</span></button>
+    <button class="nav-btn" data-view="crew"><span class="icon">👥</span><span data-i18n="navCrew">الشلة</span></button>
     <button class="nav-btn" data-view="settings"><span class="icon">⚙️</span><span data-i18n="navSettings">الإعدادات</span></button>
   </div>
 
@@ -212,6 +226,19 @@
         <button class="btn-secondary" id="cropperCancelBtn" data-i18n="cancelBtn">إلغاء</button>
         <button class="btn-primary btn-block" id="cropperConfirmBtn" data-i18n="useThisPhotoBtn">استخدم الصورة دي</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Member profile viewer overlay -->
+  <div class="overlay hidden" id="profileViewOverlay">
+    <div class="sheet">
+      <div class="profile-view-head">
+        <div id="profileViewAvatar"></div>
+        <div class="profile-view-name" id="profileViewName"></div>
+        <div class="profile-view-admin hidden" id="profileViewAdminTag" data-i18n="adminBadge">أدمن</div>
+      </div>
+      <div class="profile-view-rows" id="profileViewRows"></div>
+      <button class="btn-secondary btn-block" id="profileViewCloseBtn" data-i18n="closeBtn">إغلاق</button>
     </div>
   </div>
 
