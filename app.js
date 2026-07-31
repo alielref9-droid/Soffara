@@ -305,36 +305,45 @@ async function findOrCreateProfileForGoogleUser(user) {
   const ref = await db.collection("profiles").add(payload);
   return { id: ref.id, ...payload };
 }
-$("googleRegisterBtn").addEventListener("click", async () => {
-  try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    const result = await auth.signInWithPopup(provider);
-    profile = await findOrCreateProfileForGoogleUser(result.user);
-    setLocalProfile(profile);
-    profilesById[profile.id] = profile;
-    $("registerOverlay").classList.add("hidden");
-    bootAfterAuth();
-  } catch (err) {
-    console.error(err);
-    toast(t("toastGoogleFailed"));
-  }
+$("googleRegisterBtn").addEventListener("click", () => {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  localStorage.setItem("soffara_google_intent", "register");
+  auth.signInWithRedirect(provider);
 });
-$("googleLinkBtn").addEventListener("click", async () => {
+$("googleLinkBtn").addEventListener("click", () => {
   if (profile.auth_uid) return;
+  const provider = new firebase.auth.GoogleAuthProvider();
+  localStorage.setItem("soffara_google_intent", "link");
+  auth.signInWithRedirect(provider);
+});
+async function handleGoogleRedirectResult() {
+  const intent = localStorage.getItem("soffara_google_intent");
+  if (!intent) return;
   try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    const result = await auth.signInWithPopup(provider);
-    const updates = { auth_uid: result.user.uid, auth_email: result.user.email || null };
-    await db.collection("profiles").doc(profile.id).update(updates);
-    profile = { ...profile, ...updates };
-    setLocalProfile(profile);
-    reflectGoogleLinkUI();
-    toast(t("toastGoogleLinked"));
+    const result = await auth.getRedirectResult();
+    if (!result || !result.user) return;
+    localStorage.removeItem("soffara_google_intent");
+    if (intent === "register") {
+      profile = await findOrCreateProfileForGoogleUser(result.user);
+      setLocalProfile(profile);
+      profilesById[profile.id] = profile;
+      $("registerOverlay").classList.add("hidden");
+      bootAfterAuth();
+    } else if (intent === "link" && profile) {
+      const updates = { auth_uid: result.user.uid, auth_email: result.user.email || null };
+      await db.collection("profiles").doc(profile.id).update(updates);
+      profile = { ...profile, ...updates };
+      setLocalProfile(profile);
+      reflectGoogleLinkUI();
+      toast(t("toastGoogleLinked"));
+      showView("settings");
+    }
   } catch (err) {
     console.error(err);
+    localStorage.removeItem("soffara_google_intent");
     toast(t("toastGoogleFailed"));
   }
-});
+}
 function reflectGoogleLinkUI() {
   const btn = $("googleLinkBtn");
   const label = $("googleLinkBtnText");
@@ -731,6 +740,8 @@ function bootAfterAuth() {
   } else {
     $("registerOverlay").classList.remove("hidden");
   }
+
+  handleGoogleRedirectResult();
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch((e) => console.warn("SW failed", e));
