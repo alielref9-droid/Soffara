@@ -6,6 +6,80 @@ firebase.initializeApp(CFG.firebaseConfig);
 const db = firebase.firestore();
 
 const $ = (id) => document.getElementById(id);
+const MAX_ADMINS = 3;
+
+// ---------- i18n ----------
+function getLang() { return localStorage.getItem("soffara_lang") || "ar"; }
+function t(key, ...args) {
+  const dict = window.SOFFARA_I18N[getLang()];
+  const val = dict[key];
+  if (typeof val === "function") return val(...args);
+  return val !== undefined ? val : key;
+}
+function applyStaticI18n() {
+  const lang = getLang();
+  const dict = window.SOFFARA_I18N[lang];
+  document.documentElement.lang = lang;
+  document.documentElement.dir = dict.dir;
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.getAttribute("data-i18n");
+    if (dict[key] !== undefined) el.innerHTML = typeof dict[key] === "function" ? dict[key]() : dict[key];
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    const key = el.getAttribute("data-i18n-placeholder");
+    if (dict[key] !== undefined) el.placeholder = dict[key];
+  });
+  document.querySelectorAll(".lang-swatch").forEach((b) => {
+    b.classList.toggle("active", b.dataset.lang === lang);
+  });
+  renderPositionPickers();
+  renderLevelSelects();
+}
+function setLang(lang) {
+  localStorage.setItem("soffara_lang", lang);
+  applyStaticI18n();
+  if (profile) {
+    renderBookings();
+    reflectAdminUI();
+    $("userGreeting").textContent = t("greeting", profile.name);
+  }
+}
+document.querySelectorAll(".lang-swatch").forEach((btn) => {
+  btn.addEventListener("click", () => setLang(btn.dataset.lang));
+});
+
+// ---------- positions / level pickers ----------
+const POSITION_KEYS = ["gk", "def", "mid", "fwd"];
+let regSelectedPositions = [];
+let settingsSelectedPositions = [];
+
+function renderPositionPickers() {
+  const dict = window.SOFFARA_I18N[getLang()];
+  [["regPositions", () => regSelectedPositions], ["settingsPositions", () => settingsSelectedPositions]].forEach(([containerId, getSel]) => {
+    const el = $(containerId);
+    if (!el) return;
+    el.innerHTML = POSITION_KEYS.map((k) => `<button type="button" class="chip-option ${getSel().includes(k) ? "active" : ""}" data-pos="${k}">${dict.positions[k]}</button>`).join("");
+    el.querySelectorAll(".chip-option").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const sel = getSel();
+        const k = btn.dataset.pos;
+        const idx = sel.indexOf(k);
+        if (idx >= 0) sel.splice(idx, 1); else sel.push(k);
+        renderPositionPickers();
+      });
+    });
+  });
+}
+function renderLevelSelects() {
+  const dict = window.SOFFARA_I18N[getLang()];
+  ["regLevel", "settingsLevel"].forEach((id) => {
+    const el = $(id);
+    if (!el) return;
+    const current = el.value;
+    el.innerHTML = Object.keys(dict.levels).map((k) => `<option value="${k}">${dict.levels[k]}</option>`).join("");
+    el.value = current || "";
+  });
+}
 
 // ---------- local device / profile ----------
 function getDeviceId() {
@@ -26,17 +100,17 @@ function setLocalProfile(p) {
 
 let profile = getLocalProfile();
 let bookingsCache = [];
-let profilesById = {};   // profile_id -> {name, ...}
-let votesCache = {};     // booking_id -> [{profile_id, status, name}]
+let profilesById = {};
+let votesCache = {};
 
 // ---------- toast ----------
 let toastTimer;
 function toast(msg) {
-  const t = $("toast");
-  t.textContent = msg;
-  t.classList.remove("hidden");
+  const el = $("toast");
+  el.textContent = msg;
+  el.classList.remove("hidden");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.add("hidden"), 2200);
+  toastTimer = setTimeout(() => el.classList.add("hidden"), 2200);
 }
 
 // ---------- online/offline ----------
@@ -45,10 +119,10 @@ function updateOnlineStatus() {
   const text = $("statusText");
   if (navigator.onLine) {
     dot.classList.remove("offline");
-    text.textContent = "متصل";
+    text.textContent = t("connected");
   } else {
     dot.classList.add("offline");
-    text.textContent = "مفيش نت";
+    text.textContent = t("offline");
   }
 }
 window.addEventListener("online", updateOnlineStatus);
@@ -56,14 +130,27 @@ window.addEventListener("offline", updateOnlineStatus);
 
 // ---------- theme ----------
 function applyTheme(name) {
-  document.documentElement.setAttribute("data-theme", name);
+  document.documentElement.setAttribute("data-theme", name === "custom" ? "pitch" : name);
   localStorage.setItem("soffara_theme", name);
   document.querySelectorAll(".theme-swatch").forEach((b) => {
     b.classList.toggle("active", b.dataset.theme === name);
   });
+  $("customThemeRow").classList.toggle("hidden", name !== "custom");
+  if (name === "custom") {
+    const saved = localStorage.getItem("soffara_custom_accent") || "#E8B23D";
+    document.documentElement.style.setProperty("--gold", saved);
+    $("customAccentColor").value = saved;
+  } else {
+    document.documentElement.style.removeProperty("--gold");
+  }
 }
 document.querySelectorAll(".theme-swatch").forEach((btn) => {
   btn.addEventListener("click", () => applyTheme(btn.dataset.theme));
+});
+$("customAccentColor").addEventListener("input", (e) => {
+  const val = e.target.value;
+  localStorage.setItem("soffara_custom_accent", val);
+  document.documentElement.style.setProperty("--gold", val);
 });
 
 // ---------- tabs ----------
@@ -81,38 +168,120 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
   btn.addEventListener("click", () => showView(btn.dataset.view));
 });
 
-// ---------- image to base64 (kept small — Firestore doc limit ~1MB) ----------
-function fileToDataUrl(file, cb) {
-  if (!file) return cb(null);
-  if (file.size > 700 * 1024) {
-    toast("الصورة كبيرة أوي، اختار صورة أصغر");
-    return cb(null);
-  }
+// ============================================================
+// Photo cropper (shared: registration + settings)
+// ============================================================
+let cropperState = { scale: 1, x: 0, y: 0, naturalW: 0, naturalH: 0, onConfirm: null };
+
+function openCropper(file, onConfirm) {
+  if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => cb(reader.result);
+  reader.onload = () => {
+    const img = $("cropperImg");
+    img.onload = () => {
+      cropperState = {
+        scale: 1, x: 0, y: 0,
+        naturalW: img.naturalWidth, naturalH: img.naturalHeight,
+        onConfirm,
+      };
+      fitCropperImage();
+      $("cropperZoom").value = 1;
+      $("cropperOverlay").classList.remove("hidden");
+    };
+    img.src = reader.result;
+  };
   reader.readAsDataURL(file);
 }
+function fitCropperImage() {
+  const vp = 220;
+  const scaleToCover = Math.max(vp / cropperState.naturalW, vp / cropperState.naturalH);
+  cropperState.baseScale = scaleToCover;
+  updateCropperTransform();
+}
+function updateCropperTransform() {
+  const img = $("cropperImg");
+  const totalScale = cropperState.baseScale * cropperState.scale;
+  img.style.width = `${cropperState.naturalW * totalScale}px`;
+  img.style.height = `${cropperState.naturalH * totalScale}px`;
+  img.style.transform = `translate(-50%, -50%) translate(${cropperState.x}px, ${cropperState.y}px)`;
+}
+$("cropperZoom").addEventListener("input", (e) => {
+  cropperState.scale = parseFloat(e.target.value);
+  updateCropperTransform();
+});
+(function setupCropperDrag() {
+  const vp = $("cropperViewport");
+  let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
+  const start = (x, y) => { dragging = true; startX = x; startY = y; origX = cropperState.x; origY = cropperState.y; vp.style.cursor = "grabbing"; };
+  const move = (x, y) => {
+    if (!dragging) return;
+    cropperState.x = origX + (x - startX);
+    cropperState.y = origY + (y - startY);
+    updateCropperTransform();
+  };
+  const end = () => { dragging = false; vp.style.cursor = "grab"; };
+  vp.addEventListener("pointerdown", (e) => start(e.clientX, e.clientY));
+  window.addEventListener("pointermove", (e) => move(e.clientX, e.clientY));
+  window.addEventListener("pointerup", end);
+})();
+$("cropperCancelBtn").addEventListener("click", () => $("cropperOverlay").classList.add("hidden"));
+$("cropperConfirmBtn").addEventListener("click", () => {
+  const OUT = 480;
+  const canvas = document.createElement("canvas");
+  canvas.width = OUT; canvas.height = OUT;
+  const ctx = canvas.getContext("2d");
+  const img = $("cropperImg");
+  const vp = 220;
+  const totalScale = cropperState.baseScale * cropperState.scale;
+  const drawnW = cropperState.naturalW * totalScale;
+  const drawnH = cropperState.naturalH * totalScale;
+  const outScale = OUT / vp;
+  const dx = (vp / 2 + cropperState.x) * outScale - (drawnW * outScale) / 2;
+  const dy = (vp / 2 + cropperState.y) * outScale - (drawnH * outScale) / 2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(OUT / 2, OUT / 2, OUT / 2, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.drawImage(img, dx, dy, drawnW * outScale, drawnH * outScale);
+  ctx.restore();
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  if (dataUrl.length > 900 * 1024) {
+    toast(t("toastPhotoBig"));
+  } else if (cropperState.onConfirm) {
+    cropperState.onConfirm(dataUrl);
+  }
+  $("cropperOverlay").classList.add("hidden");
+});
+
+$("regPhotoFile").addEventListener("change", (e) => {
+  openCropper(e.target.files[0], (dataUrl) => {
+    regPhotoData = dataUrl;
+    $("regPhotoPreview").innerHTML = `<img src="${dataUrl}">`;
+  });
+});
+$("settingsPhotoFile").addEventListener("change", (e) => {
+  openCropper(e.target.files[0], (dataUrl) => {
+    settingsPhotoData = dataUrl;
+    $("profilePhotoPreview").innerHTML = `<img src="${dataUrl}">`;
+  });
+});
 
 // ============================================================
 // Registration
 // ============================================================
 let regPhotoData = null;
-$("regPhotoFile").addEventListener("change", (e) => {
-  fileToDataUrl(e.target.files[0], (data) => {
-    regPhotoData = data;
-    if (data) $("regPhotoPreview").innerHTML = `<img src="${data}">`;
-  });
-});
 
 $("registerBtn").addEventListener("click", async () => {
   const name = $("regName").value.trim();
-  if (!name) return toast("اكتب اسمك الأول");
+  if (!name) return toast(t("toastNeedName"));
   const payload = {
     device_id: getDeviceId(),
     name,
     phone: $("regPhone").value.trim() || null,
     whatsapp: $("regWhatsapp").value.trim() || null,
     photo_url: regPhotoData,
+    positions: regSelectedPositions.slice(),
+    level: $("regLevel").value || null,
     is_admin: false,
     created_at: firebase.firestore.FieldValue.serverTimestamp(),
   };
@@ -124,7 +293,7 @@ $("registerBtn").addEventListener("click", async () => {
     bootAfterAuth();
   } catch (err) {
     console.error(err);
-    toast("حصل خطأ، جرب تاني");
+    toast(t("toastRegFailed"));
   }
 });
 
@@ -132,58 +301,74 @@ $("registerBtn").addEventListener("click", async () => {
 // Settings / profile edit
 // ============================================================
 let settingsPhotoData = null;
-$("settingsPhotoFile").addEventListener("change", (e) => {
-  fileToDataUrl(e.target.files[0], (data) => {
-    if (data) { settingsPhotoData = data; $("profilePhotoPreview").innerHTML = `<img src="${data}">`; }
-  });
-});
 function fillSettingsForm() {
   if (!profile) return;
   $("settingsName").value = profile.name || "";
   $("settingsPhone").value = profile.phone || "";
   $("settingsWhatsapp").value = profile.whatsapp || "";
   if (profile.photo_url) $("profilePhotoPreview").innerHTML = `<img src="${profile.photo_url}">`;
+  settingsSelectedPositions = (profile.positions || []).slice();
+  renderPositionPickers();
+  $("settingsLevel").value = profile.level || "";
 }
 $("saveProfileBtn").addEventListener("click", async () => {
   const updates = {
     name: $("settingsName").value.trim() || profile.name,
     phone: $("settingsPhone").value.trim() || null,
     whatsapp: $("settingsWhatsapp").value.trim() || null,
+    positions: settingsSelectedPositions.slice(),
+    level: $("settingsLevel").value || null,
   };
   if (settingsPhotoData) updates.photo_url = settingsPhotoData;
   try {
     await db.collection("profiles").doc(profile.id).update(updates);
     profile = { ...profile, ...updates };
     setLocalProfile(profile);
-    $("userGreeting").textContent = `أهلاً بيك يا ${profile.name} 👋`;
-    toast("اتحفظ بنجاح ✅");
+    profilesById[profile.id] = profile;
+    $("userGreeting").textContent = t("greeting", profile.name);
+    toast(t("toastSaveOk"));
   } catch (err) {
     console.error(err);
-    toast("مقدرناش نحفظ، جرب تاني");
+    toast(t("toastSaveFailed"));
   }
 });
 
-// admin login
+// admin login (max 3 admins)
 $("adminLoginBtn").addEventListener("click", async () => {
   const code = $("adminCodeInput").value;
-  if (code !== CFG.ADMIN_CODE) return toast("الكود غلط");
+  if (code !== CFG.ADMIN_CODE) return toast(t("toastWrongCode"));
   try {
+    const adminsSnap = await db.collection("profiles").where("is_admin", "==", true).get();
+    if (adminsSnap.size >= MAX_ADMINS) return toast(t("toastAdminFull"));
     await db.collection("profiles").doc(profile.id).update({ is_admin: true });
     profile = { ...profile, is_admin: true };
     setLocalProfile(profile);
+    profilesById[profile.id] = profile;
     reflectAdminUI();
-    toast("اتسجلت كأدمن ✅");
+    toast(t("toastAdminOk"));
   } catch (err) {
     console.error(err);
-    toast("حصل خطأ");
   }
 });
 function reflectAdminUI() {
   const isAdmin = !!(profile && profile.is_admin);
   $("adminLoggedOut").classList.toggle("hidden", isAdmin);
   $("adminLoggedIn").classList.toggle("hidden", !isAdmin);
-  $("adminBadge").innerHTML = isAdmin ? `<span class="admin-badge">أدمن</span>` : "";
+  $("adminLoggedInBadge").textContent = t("adminBadgeLoggedIn");
+  $("adminBadge").innerHTML = isAdmin ? `<span class="admin-badge">${t("adminBadge")}</span>` : "";
   $("fabNewBooking").classList.toggle("hidden", !(isAdmin && !$("view-bookings").classList.contains("hidden")));
+}
+
+// ============================================================
+// Avatar rendering helper
+// ============================================================
+function avatarHtml(p, sizeClass) {
+  const ring = p && p.is_admin ? "admin-ring" : "";
+  if (p && p.photo_url) {
+    return `<img class="${sizeClass || "avatar-img"} ${ring}" src="${p.photo_url}">`;
+  }
+  const initial = ((p && p.name) || "?").trim().charAt(0);
+  return `<span class="${sizeClass === "avatar-img" ? "avatar-fallback" : "avatar-fallback"} ${ring}">${escapeHtml(initial)}</span>`;
 }
 
 // ============================================================
@@ -201,7 +386,7 @@ $("submitNewBookingBtn").addEventListener("click", async () => {
   const match_time = $("nbTime").value || null;
   const notes = $("nbNotes").value.trim() || null;
   if (!field_name || !address || !price || !capacity || !match_date) {
-    return toast("املا كل الخانات المطلوبة (*)");
+    return toast(t("toastFillRequired"));
   }
   try {
     await db.collection("bookings").add({
@@ -211,17 +396,17 @@ $("submitNewBookingBtn").addEventListener("click", async () => {
     });
     ["nbField","nbAddress","nbPrice","nbCapacity","nbDate","nbTime","nbNotes"].forEach((id) => $(id).value = "");
     $("newBookingOverlay").classList.add("hidden");
-    toast("اتحجز بنجاح ⚽");
+    toast(t("toastBookingOk"));
   } catch (err) {
     console.error(err);
-    toast("مقدرناش نحجز، جرب تاني");
+    toast(t("toastBookingFailed"));
   }
 });
 
 async function ensureProfileCached(id) {
   if (profilesById[id]) return profilesById[id];
   const doc = await db.collection("profiles").doc(id).get();
-  const data = doc.exists ? doc.data() : { name: "عضو" };
+  const data = doc.exists ? { id, ...doc.data() } : { id, name: "?" };
   profilesById[id] = data;
   return data;
 }
@@ -232,7 +417,7 @@ async function refreshVotesForBooking(bookingId) {
   for (const doc of snap.docs) {
     const v = doc.data();
     const p = await ensureProfileCached(v.profile_id);
-    rows.push({ profile_id: v.profile_id, status: v.status, name: p.name || "عضو" });
+    rows.push({ profile_id: v.profile_id, status: v.status, profileObj: p });
   }
   votesCache[bookingId] = rows;
 }
@@ -240,7 +425,7 @@ async function refreshVotesForBooking(bookingId) {
 async function renderBookings() {
   const list = $("bookingsList");
   if (!bookingsCache.length) {
-    list.innerHTML = `<div class="empty-state">مفيش حجوزات لسه.<br>${profile?.is_admin ? "اضغط + حجز جديد تحت." : "استنى الأدمن يحجز ملعب 👀"}</div>`;
+    list.innerHTML = `<div class="empty-state">${profile?.is_admin ? t("emptyBookingsAdmin") : t("emptyBookingsUser")}</div>`;
     return;
   }
   await Promise.all(bookingsCache.map((b) => refreshVotesForBooking(b.id)));
@@ -251,7 +436,9 @@ async function renderBookings() {
     const outList = votes.filter((v) => v.status === "not_coming");
     const myVote = votes.find((v) => v.profile_id === profile.id);
     const isFull = inList.length >= b.capacity;
-    const dateFmt = new Date(b.match_date + "T00:00:00").toLocaleDateString("ar-EG", { weekday: "long", day: "numeric", month: "long" });
+    const dateFmt = new Date(b.match_date + "T00:00:00").toLocaleDateString(getLang() === "ar" ? "ar-EG" : "en-GB", { weekday: "long", day: "numeric", month: "long" });
+
+    const chipRow = (arr) => arr.map((v) => `<span class="avatar-chip">${avatarHtml(v.profileObj, "avatar-img")}${escapeHtml(v.profileObj.name || "?")}</span>`).join("") || `<span class="avatar-chip">${t("nobodyYet")}</span>`;
 
     return `
       <div class="ticket ${isFull ? "full" : ""}">
@@ -270,15 +457,15 @@ async function renderBookings() {
         <div class="perforation"></div>
         <div class="ticket-body">
           <div class="vote-row">
-            <button class="vote-btn in ${myVote?.status === "coming" ? "active" : ""}" data-booking="${b.id}" data-status="coming">✅ أنا جاي</button>
-            <button class="vote-btn out ${myVote?.status === "not_coming" ? "active" : ""}" data-booking="${b.id}" data-status="not_coming">❌ مش هقدر</button>
+            <button class="vote-btn in ${myVote?.status === "coming" ? "active" : ""}" data-booking="${b.id}" data-status="coming">${t("comingBtn")}</button>
+            <button class="vote-btn out ${myVote?.status === "not_coming" ? "active" : ""}" data-booking="${b.id}" data-status="not_coming">${t("notComingBtn")}</button>
           </div>
-          <div class="vote-count">الجايين (${inList.length}): </div>
-          <div class="avatars">${inList.map((v) => `<span class="avatar-chip">${escapeHtml(v.name)}</span>`).join("") || '<span class="avatar-chip">لسه محدش</span>'}</div>
-          ${outList.length ? `<div class="vote-count" style="margin-top:8px">مش هيقدروا (${outList.length}): </div><div class="avatars">${outList.map((v) => `<span class="avatar-chip">${escapeHtml(v.name)}</span>`).join("")}</div>` : ""}
+          <div class="vote-count">${t("comingCountLabel", inList.length)}</div>
+          <div class="avatars">${chipRow(inList)}</div>
+          ${outList.length ? `<div class="vote-count" style="margin-top:8px">${t("notComingCountLabel", outList.length)}</div><div class="avatars">${chipRow(outList)}</div>` : ""}
           ${b.notes ? `<div class="vote-count" style="margin-top:8px">📝 ${escapeHtml(b.notes)}</div>` : ""}
         </div>
-        ${profile?.is_admin ? `<div class="ticket-admin"><button class="link-danger" data-delete="${b.id}">مسح الحجز</button></div>` : ""}
+        ${profile?.is_admin ? `<div class="ticket-admin"><button class="link-danger" data-delete="${b.id}">${t("deleteBookingBtn")}</button></div>` : ""}
       </div>
     `;
   }).join("");
@@ -300,20 +487,20 @@ async function castVote(bookingId, status) {
     }, { merge: true });
   } catch (err) {
     console.error(err);
-    toast("مقدرناش نسجل صوتك");
+    toast(t("toastVoteFailed"));
   }
 }
 
 async function deleteBooking(id) {
-  if (!confirm("متأكد عايز تمسح الحجز ده؟")) return;
+  if (!confirm(t("confirmDeleteBooking"))) return;
   try {
     await db.collection("bookings").doc(id).delete();
     const votesSnap = await db.collection("votes").where("booking_id", "==", id).get();
     await Promise.all(votesSnap.docs.map((d) => d.ref.delete()));
-    toast("اتمسح الحجز");
+    toast(t("toastDeleteOk"));
   } catch (err) {
     console.error(err);
-    toast("مقدرناش نمسح");
+    toast(t("toastDeleteFailed"));
   }
 }
 
@@ -322,19 +509,41 @@ function escapeHtml(s) {
 }
 
 // ============================================================
-// Chat
+// Chat + typing indicator
 // ============================================================
+function chatDateLabel(d) {
+  const now = new Date();
+  const startOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const diffDays = Math.round((startOf(now) - startOf(d)) / 86400000);
+  if (diffDays === 0) return t("dateToday");
+  if (diffDays === 1) return t("dateYesterday");
+  return d.toLocaleDateString(getLang() === "ar" ? "ar-EG" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+}
 function renderMessages(msgs) {
   const log = $("chatLog");
-  log.innerHTML = msgs.map((m) => {
+  let lastDateKey = null;
+  const parts = [];
+  msgs.forEach((m) => {
+    const d = m.created_at && m.created_at.toDate ? m.created_at.toDate() : new Date();
+    const dateKey = d.toDateString();
+    if (dateKey !== lastDateKey) {
+      lastDateKey = dateKey;
+      parts.push(`<div class="chat-date-divider"><span>${chatDateLabel(d)}</span></div>`);
+    }
     const mine = m.profile_id === profile.id;
-    const name = profilesById[m.profile_id]?.name || "عضو";
-    return `
-      <div class="msg ${mine ? "mine" : ""}">
-        <div class="msg-name">${escapeHtml(name)}</div>
-        <div class="msg-bubble">${escapeHtml(m.content)}</div>
-      </div>`;
-  }).join("");
+    const p = profilesById[m.profile_id] || { name: "?" };
+    const timeStr = d.toLocaleTimeString(getLang() === "ar" ? "ar-EG" : "en-GB", { hour: "2-digit", minute: "2-digit" });
+    parts.push(`
+      <div class="msg-with-avatar ${mine ? "mine" : ""}">
+        ${avatarHtml(p, "avatar-img")}
+        <div class="msg-col">
+          <div class="msg-name">${escapeHtml(p.name || "?")}</div>
+          <div class="msg-bubble">${escapeHtml(m.content)}</div>
+          <div class="msg-time">${timeStr}</div>
+        </div>
+      </div>`);
+  });
+  log.innerHTML = parts.join("");
   scrollChatToBottom();
 }
 function scrollChatToBottom() {
@@ -346,6 +555,7 @@ async function sendMessage() {
   const content = input.value.trim();
   if (!content) return;
   input.value = "";
+  clearTyping();
   try {
     await db.collection("messages").add({
       profile_id: profile.id, content,
@@ -353,11 +563,37 @@ async function sendMessage() {
     });
   } catch (err) {
     console.error(err);
-    toast("مقدرناش نبعت الرسالة");
+    toast(t("toastMsgFailed"));
   }
 }
 $("chatSendBtn").addEventListener("click", sendMessage);
 $("chatInput").addEventListener("keydown", (e) => { if (e.key === "Enter") sendMessage(); });
+
+let typingDebounce;
+$("chatInput").addEventListener("input", () => {
+  clearTimeout(typingDebounce);
+  setTyping();
+  typingDebounce = setTimeout(clearTyping, 3000);
+});
+function setTyping() {
+  if (!profile) return;
+  db.collection("typing").doc(profile.id).set({ name: profile.name, ts: Date.now() }).catch(() => {});
+}
+function clearTyping() {
+  if (!profile) return;
+  db.collection("typing").doc(profile.id).delete().catch(() => {});
+}
+function renderTyping(docs) {
+  const now = Date.now();
+  const others = docs
+    .filter((d) => d.id !== profile.id)
+    .map((d) => d.data())
+    .filter((d) => now - (d.ts || 0) < 4000);
+  const el = $("typingIndicator");
+  if (!others.length) { el.classList.add("hidden"); el.textContent = ""; return; }
+  el.classList.remove("hidden");
+  el.textContent = others.length === 1 ? t("typingSingle", others[0].name) : t("typingMultiple", others.length);
+}
 
 // ============================================================
 // Realtime listeners
@@ -379,26 +615,31 @@ function setupRealtime() {
       await Promise.all(msgs.map((m) => ensureProfileCached(m.profile_id)));
       renderMessages(msgs);
     }, (err) => console.error(err));
+
+  db.collection("typing").onSnapshot((snap) => {
+    renderTyping(snap.docs);
+  }, (err) => console.error(err));
 }
 
 // ============================================================
 // Boot
 // ============================================================
 function bootAfterAuth() {
-  $("userGreeting").textContent = `أهلاً بيك يا ${profile.name} 👋`;
+  $("userGreeting").textContent = t("greeting", profile.name);
   fillSettingsForm();
   reflectAdminUI();
   setupRealtime();
 }
 
 (function init() {
+  applyStaticI18n();
   updateOnlineStatus();
   applyTheme(localStorage.getItem("soffara_theme") || "pitch");
+  renderPositionPickers();
+  renderLevelSelects();
 
   const cfgLooksEmpty = Object.values(CFG.firebaseConfig).some((v) => String(v).includes("PASTE_HERE"));
-  if (cfgLooksEmpty) {
-    toast("لازم تحط بيانات Firebase في config.js الأول");
-  }
+  if (cfgLooksEmpty) toast(t("toastNeedConfig"));
 
   if (profile) {
     $("registerOverlay").classList.add("hidden");

@@ -296,3 +296,70 @@ html[data-theme="night"] .nav-btn.active { color: var(--gold); }
   text-align: center; font-size: 13.5px; z-index: 40; box-shadow: var(--shadow);
 }
 .toast.hidden { display: none; }
+
+/* ===================== Avatars / admin ring ===================== */
+.avatar-img {
+  width: 26px; height: 26px; border-radius: 50%; object-fit: cover;
+  display: inline-block; vertical-align: middle; background: var(--chalk);
+  border: 2px solid transparent;
+}
+.avatar-fallback {
+  width: 26px; height: 26px; border-radius: 50%; display: inline-flex;
+  align-items: center; justify-content: center; background: var(--pitch-dark);
+  color: var(--chalk); font-size: 12px; font-weight: 800; vertical-align: middle;
+  border: 2px solid transparent;
+}
+.admin-ring { border-color: var(--gold) !important; box-shadow: 0 0 0 1px var(--gold); }
+.avatar-chip { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ===================== Chat with avatars ===================== */
+.msg-with-avatar { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 10px; }
+.msg-with-avatar.mine { flex-direction: row-reverse; }
+.msg-with-avatar .avatar-img, .msg-with-avatar .avatar-fallback { width: 30px; height: 30px; flex-shrink: 0; }
+.msg-with-avatar .msg-col { max-width: 74%; }
+.msg-with-avatar.mine .msg-col { text-align: end; }
+.msg-time { font-size: 10.5px; color: var(--ink-soft); margin-top: 2px; }
+.chat-date-divider { text-align: center; margin: 14px 0; }
+.chat-date-divider span {
+  background: var(--card); color: var(--ink-soft); font-size: 11.5px; font-weight: 700;
+  padding: 4px 12px; border-radius: 999px; box-shadow: var(--shadow);
+}
+
+/* ===================== Typing indicator ===================== */
+.typing-indicator {
+  font-size: 12px; color: var(--ink-soft); padding: 2px 4px 6px; font-style: italic;
+}
+.typing-indicator.hidden { display: none; }
+
+/* ===================== Position chips (registration/settings) ===================== */
+.chip-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-option {
+  padding: 8px 14px; border-radius: 999px; border: 2px solid var(--pitch-line);
+  background: transparent; color: var(--ink); font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.chip-option.active { background: var(--gold); border-color: var(--gold); color: var(--pitch-dark); }
+
+/* ===================== Language buttons ===================== */
+.lang-swatch {
+  flex: 1; padding: 12px 8px; border-radius: 12px; border: 2px solid var(--pitch-line);
+  text-align: center; font-size: 13px; font-weight: 700; cursor: pointer; background: transparent; color: var(--ink);
+}
+.lang-swatch.active { border-color: var(--gold); background: rgba(232,178,61,0.12); }
+
+/* ===================== Custom theme ===================== */
+.custom-theme-row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.custom-theme-row.hidden { display: none; }
+.custom-theme-row input[type="color"] {
+  width: 46px; height: 34px; border: none; border-radius: 8px; background: none; cursor: pointer;
+}
+
+/* ===================== Photo cropper ===================== */
+.cropper-viewport {
+  width: 220px; height: 220px; margin: 0 auto 14px; border-radius: 50%;
+  overflow: hidden; position: relative; background: var(--card);
+  border: 3px dashed var(--pitch-line); touch-action: none; cursor: grab;
+}
+.cropper-viewport img {
+  position: absolute; top: 50%; left: 50%; max-width: none;
+  transform-origin: center center; user-select: none; -webkit-user-drag: none;
+}

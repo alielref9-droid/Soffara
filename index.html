@@ -19,28 +19,29 @@
   <!-- Top bar -->
   <div class="topbar">
     <div class="topbar-row">
-      <div class="brand"><span class="whistle">🏟️</span>صفارة</div>
+      <div class="brand"><span class="whistle">🏟️</span><span data-i18n="appName">صفارة</span></div>
       <div class="status-pill">
         <span class="status-dot" id="statusDot"></span>
-        <span id="statusText">متصل</span>
+        <span id="statusText" data-i18n="connected">متصل</span>
       </div>
     </div>
-    <div class="topbar-sub" id="userGreeting">أهلاً بيك 👋</div>
+    <div class="topbar-sub" id="userGreeting">👋</div>
   </div>
 
   <!-- Bookings view -->
   <div class="view" id="view-bookings">
-    <div class="section-title">المباريات الجاية <span id="adminBadge"></span></div>
+    <div class="section-title"><span data-i18n="sectionUpcoming">المباريات الجاية</span> <span id="adminBadge"></span></div>
     <div id="bookingsList"></div>
   </div>
 
   <!-- Chat view -->
   <div class="view hidden" id="view-chat">
     <div class="chat-wrap">
-      <div class="section-title">دردشة الشلة</div>
+      <div class="section-title" data-i18n="sectionChat">دردشة الشلة</div>
       <div class="chat-log" id="chatLog"></div>
+      <div class="typing-indicator hidden" id="typingIndicator"></div>
       <div class="chat-input-row">
-        <input id="chatInput" type="text" placeholder="اكتب رسالة..." maxlength="500">
+        <input id="chatInput" type="text" data-i18n-placeholder="chatPlaceholder" placeholder="اكتب رسالة..." maxlength="500">
         <button class="chat-send" id="chatSendBtn">↩</button>
       </div>
     </div>
@@ -48,45 +49,66 @@
 
   <!-- Settings view -->
   <div class="view hidden" id="view-settings">
-    <div class="section-title">الإعدادات</div>
+    <div class="section-title" data-i18n="sectionSettings">الإعدادات</div>
 
     <div class="settings-card">
-      <h3>بروفايلك</h3>
+      <h3 data-i18n="profileHeading">بروفايلك</h3>
       <div class="photo-pick">
         <div class="photo-preview" id="profilePhotoPreview">👤</div>
         <div style="flex:1">
-          <div class="field"><input id="settingsName" type="text" placeholder="اسمك"></div>
+          <div class="field"><input id="settingsName" type="text" data-i18n-placeholder="namePlaceholder" placeholder="اسمك"></div>
         </div>
       </div>
-      <div class="field"><label>رقم الموبايل</label><input id="settingsPhone" type="tel" placeholder="01xxxxxxxxx"></div>
-      <div class="field"><label>رقم الواتساب</label><input id="settingsWhatsapp" type="tel" placeholder="01xxxxxxxxx"></div>
-      <div class="field"><label>الصورة الشخصية (اختياري)</label><input id="settingsPhotoFile" type="file" accept="image/*"></div>
-      <button class="btn-primary btn-block" id="saveProfileBtn">حفظ البروفايل</button>
+      <div class="field"><label data-i18n="phoneLabel">رقم الموبايل</label><input id="settingsPhone" type="tel" placeholder="01xxxxxxxxx"></div>
+      <div class="field"><label data-i18n="whatsappLabel">رقم الواتساب</label><input id="settingsWhatsapp" type="tel" placeholder="01xxxxxxxxx"></div>
+      <div class="field"><label data-i18n="photoLabel">الصورة الشخصية (اختياري)</label><input id="settingsPhotoFile" type="file" accept="image/*"></div>
+
+      <div class="field"><label data-i18n="positionsLabel">مركزك المفضل (اختياري)</label>
+        <div class="chip-group" id="settingsPositions"></div>
+      </div>
+      <div class="field"><label data-i18n="levelLabel">مستواك (اختياري)</label>
+        <select id="settingsLevel"></select>
+      </div>
+
+      <button class="btn-primary btn-block" id="saveProfileBtn" data-i18n="saveProfile">حفظ البروفايل</button>
     </div>
 
     <div class="settings-card">
-      <h3>ثيم التطبيق</h3>
+      <h3 data-i18n="themeHeading">ثيم التطبيق</h3>
       <div class="theme-row">
-        <button class="theme-swatch" data-theme="pitch">ملعب 🌿</button>
-        <button class="theme-swatch" data-theme="night">ليلي 🌙</button>
-        <button class="theme-swatch" data-theme="day">نهاري ☀️</button>
+        <button class="theme-swatch" data-theme="pitch" data-i18n="themePitch">ملعب 🌿</button>
+        <button class="theme-swatch" data-theme="night" data-i18n="themeNight">ليلي 🌙</button>
+        <button class="theme-swatch" data-theme="day" data-i18n="themeDay">نهاري ☀️</button>
+        <button class="theme-swatch" data-theme="custom" data-i18n="themeCustom">مخصص 🎨</button>
+      </div>
+      <div class="custom-theme-row hidden" id="customThemeRow">
+        <label data-i18n="accentColorLabel">لون التطبيق المفضل</label>
+        <input type="color" id="customAccentColor" value="#E8B23D">
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3 data-i18n="languageHeading">لغة التطبيق</h3>
+      <div class="theme-row">
+        <button class="lang-swatch" data-lang="ar">العربية</button>
+        <button class="lang-swatch" data-lang="en">English</button>
       </div>
     </div>
 
     <div class="settings-card" id="adminCard">
-      <h3>دخول الأدمن</h3>
+      <h3 data-i18n="adminHeading">دخول الأدمن</h3>
       <div id="adminLoggedOut">
-        <div class="field"><input id="adminCodeInput" type="password" placeholder="كود الأدمن"></div>
-        <button class="btn-secondary btn-block" id="adminLoginBtn">تسجيل الدخول كأدمن</button>
+        <div class="field"><input id="adminCodeInput" type="password" data-i18n-placeholder="adminCodePlaceholder" placeholder="كود الأدمن"></div>
+        <button class="btn-secondary btn-block" id="adminLoginBtn" data-i18n="adminLoginBtn">تسجيل الدخول كأدمن</button>
       </div>
       <div id="adminLoggedIn" class="hidden">
-        <span class="admin-badge">✅ أنت أدمن التطبيق</span>
+        <span class="admin-badge" id="adminLoggedInBadge">✅</span>
       </div>
     </div>
 
     <div class="settings-card">
-      <h3>عن التطبيق</h3>
-      <div style="font-size:13px;color:var(--ink-soft);line-height:1.9">
+      <h3 data-i18n="aboutHeading">عن التطبيق</h3>
+      <div style="font-size:13px;color:var(--ink-soft);line-height:1.9" data-i18n="aboutText">
         صفارة — تطبيق شلة الكورة لحجز الملاعب والتصويت والدردشة.<br>
         محتاج نت عشان الرسايل والتحديثات توصلك أول بأول.
       </div>
@@ -95,51 +117,77 @@
 
   <!-- FAB (new booking, admin only, shown on bookings tab) -->
   <div class="fab hidden" id="fabNewBooking">
-    <button class="btn-primary" id="openNewBookingBtn">+ حجز جديد</button>
+    <button class="btn-primary" id="openNewBookingBtn"><span data-i18n="newBookingBtn">+ حجز جديد</span></button>
   </div>
 
   <!-- Bottom nav -->
   <div class="bottom-nav">
-    <button class="nav-btn active" data-view="bookings"><span class="icon">📋</span>الحجوزات</button>
-    <button class="nav-btn" data-view="chat"><span class="icon">💬</span>الدردشة</button>
-    <button class="nav-btn" data-view="settings"><span class="icon">⚙️</span>الإعدادات</button>
+    <button class="nav-btn active" data-view="bookings"><span class="icon">📋</span><span data-i18n="navBookings">الحجوزات</span></button>
+    <button class="nav-btn" data-view="chat"><span class="icon">💬</span><span data-i18n="navChat">الدردشة</span></button>
+    <button class="nav-btn" data-view="settings"><span class="icon">⚙️</span><span data-i18n="navSettings">الإعدادات</span></button>
   </div>
 
   <!-- Registration overlay (first run) -->
   <div class="overlay" id="registerOverlay">
     <div class="sheet">
-      <div class="sheet-title">قبل ما تدخل... عرّفنا بيك 👋</div>
+      <div class="sheet-title" data-i18n="registerHeading">قبل ما تدخل... عرّفنا بيك 👋</div>
       <div class="photo-pick">
         <div class="photo-preview" id="regPhotoPreview">👤</div>
         <div style="flex:1">
-          <div class="field"><label>الصورة (اختياري)</label><input id="regPhotoFile" type="file" accept="image/*"></div>
+          <div class="field"><label data-i18n="photoLabel">الصورة (اختياري)</label><input id="regPhotoFile" type="file" accept="image/*"></div>
         </div>
       </div>
-      <div class="field"><label>اسمك *</label><input id="regName" type="text" placeholder="اسمك في الشلة"></div>
-      <div class="field"><label>رقم الموبايل</label><input id="regPhone" type="tel" placeholder="01xxxxxxxxx"></div>
-      <div class="field"><label>رقم الواتساب</label><input id="regWhatsapp" type="tel" placeholder="01xxxxxxxxx"></div>
-      <button class="btn-primary btn-block" id="registerBtn">يلا نبدأ ⚽</button>
+      <div class="field"><label data-i18n="registerNameLabel">اسمك *</label><input id="regName" type="text" data-i18n-placeholder="namePlaceholder" placeholder="اسمك في الشلة"></div>
+      <div class="field"><label data-i18n="registerPhoneLabel">رقم الموبايل</label><input id="regPhone" type="tel" placeholder="01xxxxxxxxx"></div>
+      <div class="field"><label data-i18n="registerWhatsappLabel">رقم الواتساب</label><input id="regWhatsapp" type="tel" placeholder="01xxxxxxxxx"></div>
+
+      <div class="field"><label data-i18n="positionsLabel">مركزك المفضل (اختياري)</label>
+        <div class="chip-group" id="regPositions"></div>
+      </div>
+      <div class="field"><label data-i18n="levelLabel">مستواك (اختياري)</label>
+        <select id="regLevel"></select>
+      </div>
+
+      <button class="btn-primary btn-block" id="registerBtn" data-i18n="startBtn">يلا نبدأ ⚽</button>
     </div>
   </div>
 
   <!-- New booking overlay -->
   <div class="overlay hidden" id="newBookingOverlay">
     <div class="sheet">
-      <div class="sheet-title">حجز ملعب جديد</div>
-      <div class="field"><label>اسم الملعب *</label><input id="nbField" type="text" placeholder="مثال: ملعب النادي الأهلي"></div>
-      <div class="field"><label>العنوان *</label><input id="nbAddress" type="text" placeholder="عنوان الملعب"></div>
+      <div class="sheet-title" data-i18n="newBookingHeading">حجز ملعب جديد</div>
+      <div class="field"><label data-i18n="fieldNameLabel">اسم الملعب *</label><input id="nbField" type="text"></div>
+      <div class="field"><label data-i18n="addressLabel">العنوان *</label><input id="nbAddress" type="text"></div>
       <div class="field-row">
-        <div class="field"><label>السعر (ج.م) *</label><input id="nbPrice" type="number" placeholder="0"></div>
-        <div class="field"><label>العدد المطلوب *</label><input id="nbCapacity" type="number" placeholder="10"></div>
+        <div class="field"><label data-i18n="priceLabel">السعر (ج.م) *</label><input id="nbPrice" type="number"></div>
+        <div class="field"><label data-i18n="capacityLabel">العدد المطلوب *</label><input id="nbCapacity" type="number"></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>التاريخ *</label><input id="nbDate" type="date"></div>
-        <div class="field"><label>الميعاد</label><input id="nbTime" type="time"></div>
+        <div class="field"><label data-i18n="dateLabel">التاريخ *</label><input id="nbDate" type="date"></div>
+        <div class="field"><label data-i18n="timeLabel">الميعاد</label><input id="nbTime" type="time"></div>
       </div>
-      <div class="field"><label>ملاحظات</label><textarea id="nbNotes" rows="2" placeholder="أي تفاصيل زيادة..."></textarea></div>
+      <div class="field"><label data-i18n="notesLabel">ملاحظات</label><textarea id="nbNotes" rows="2"></textarea></div>
       <div class="sheet-actions">
-        <button class="btn-secondary" id="cancelNewBookingBtn">إلغاء</button>
-        <button class="btn-primary btn-block" id="submitNewBookingBtn">احجز</button>
+        <button class="btn-secondary" id="cancelNewBookingBtn" data-i18n="cancelBtn">إلغاء</button>
+        <button class="btn-primary btn-block" id="submitNewBookingBtn" data-i18n="bookBtn">احجز</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo cropper overlay (shared by registration + settings) -->
+  <div class="overlay hidden" id="cropperOverlay">
+    <div class="sheet">
+      <div class="sheet-title" data-i18n="cropHeading">ظبط الصورة</div>
+      <div class="cropper-viewport" id="cropperViewport">
+        <img id="cropperImg" draggable="false">
+      </div>
+      <div class="field">
+        <label data-i18n="zoomLabel">تكبير</label>
+        <input type="range" id="cropperZoom" min="1" max="3" step="0.01" value="1">
+      </div>
+      <div class="sheet-actions">
+        <button class="btn-secondary" id="cropperCancelBtn" data-i18n="cancelBtn">إلغاء</button>
+        <button class="btn-primary btn-block" id="cropperConfirmBtn" data-i18n="useThisPhotoBtn">استخدم الصورة دي</button>
       </div>
     </div>
   </div>
@@ -150,6 +198,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="config.js"></script>
+<script src="i18n.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
