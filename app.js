@@ -42,6 +42,7 @@ function setLang(lang) {
   if (profile) {
     renderBookings();
     reflectAdminUI();
+    reflectGoogleLinkUI();
     $("userGreeting").textContent = t("greeting", profile.name);
   }
 }
@@ -291,6 +292,7 @@ async function findOrCreateProfileForGoogleUser(user) {
   const payload = {
     device_id: getDeviceId(),
     auth_uid: user.uid,
+    auth_email: user.email || null,
     name: user.displayName || "عضو",
     phone: null,
     whatsapp: null,
@@ -318,18 +320,34 @@ $("googleRegisterBtn").addEventListener("click", async () => {
   }
 });
 $("googleLinkBtn").addEventListener("click", async () => {
+  if (profile.auth_uid) return;
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
     const result = await auth.signInWithPopup(provider);
-    await db.collection("profiles").doc(profile.id).update({ auth_uid: result.user.uid });
-    profile = { ...profile, auth_uid: result.user.uid };
+    const updates = { auth_uid: result.user.uid, auth_email: result.user.email || null };
+    await db.collection("profiles").doc(profile.id).update(updates);
+    profile = { ...profile, ...updates };
     setLocalProfile(profile);
+    reflectGoogleLinkUI();
     toast(t("toastGoogleLinked"));
   } catch (err) {
     console.error(err);
     toast(t("toastGoogleFailed"));
   }
 });
+function reflectGoogleLinkUI() {
+  const btn = $("googleLinkBtn");
+  const label = $("googleLinkBtnText");
+  if (profile && profile.auth_uid) {
+    btn.classList.add("linked");
+    btn.disabled = true;
+    label.textContent = t("googleAlreadyLinked", profile.auth_email || "");
+  } else {
+    btn.classList.remove("linked");
+    btn.disabled = false;
+    label.textContent = t("googleLinkBtn");
+  }
+}
 
 // ============================================================
 // Registration
@@ -375,6 +393,7 @@ function fillSettingsForm() {
   settingsSelectedPositions = (profile.positions || []).slice();
   renderPositionPickers();
   $("settingsLevel").value = profile.level || "";
+  reflectGoogleLinkUI();
 }
 $("saveProfileBtn").addEventListener("click", async () => {
   const updates = {

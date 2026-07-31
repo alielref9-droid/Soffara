@@ -368,6 +368,9 @@ html[data-theme="night"] .nav-btn.active { color: var(--gold); }
   background: var(--card); color: var(--ink); border: 2px solid var(--pitch-line);
   font-weight: 700; padding: 11px 18px; border-radius: 12px; cursor: pointer; font-size: 14px;
 }
+.btn-google.linked {
+  background: rgba(46,139,87,0.12); border-color: var(--green-ok); color: var(--green-ok); cursor: default;
+}
   width: 46px; height: 34px; border: none; border-radius: 8px; background: none; cursor: pointer;
 }
 
