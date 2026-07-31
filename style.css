@@ -347,9 +347,27 @@ html[data-theme="night"] .nav-btn.active { color: var(--gold); }
 .lang-swatch.active { border-color: var(--gold); background: rgba(232,178,61,0.12); }
 
 /* ===================== Custom theme ===================== */
-.custom-theme-row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.custom-theme-row { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 .custom-theme-row.hidden { display: none; }
-.custom-theme-row input[type="color"] {
+.color-field { display: flex; align-items: center; justify-content: space-between; }
+.color-field label { font-size: 13px; color: var(--ink-soft); font-weight: 700; }
+.color-field input[type="color"] {
+  width: 44px; height: 32px; border-radius: 8px; border: 2px solid var(--pitch-line); padding: 0; background: none; cursor: pointer;
+}
+.or-divider {
+  text-align: center; color: var(--ink-soft); font-size: 12.5px; font-weight: 700;
+  margin: 12px 0; position: relative;
+}
+.or-divider::before, .or-divider::after {
+  content: ""; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--pitch-line);
+}
+.or-divider::before { right: 0; }
+.or-divider::after { left: 0; }
+.btn-google {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--card); color: var(--ink); border: 2px solid var(--pitch-line);
+  font-weight: 700; padding: 11px 18px; border-radius: 12px; cursor: pointer; font-size: 14px;
+}
   width: 46px; height: 34px; border: none; border-radius: 8px; background: none; cursor: pointer;
 }
 

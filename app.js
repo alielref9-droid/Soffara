@@ -4,6 +4,7 @@
 const CFG = window.SOFFARA_CONFIG;
 firebase.initializeApp(CFG.firebaseConfig);
 const db = firebase.firestore();
+const auth = firebase.auth();
 
 const $ = (id) => document.getElementById(id);
 const MAX_ADMINS = 3;
@@ -129,6 +130,13 @@ window.addEventListener("online", updateOnlineStatus);
 window.addEventListener("offline", updateOnlineStatus);
 
 // ---------- theme ----------
+const CUSTOM_COLOR_MAP = {
+  customBgColor: "--chalk",
+  customCardColor: "--card",
+  customHeaderColor: "--pitch-dark",
+  customTextColor: "--ink",
+  customAccentColor: "--gold",
+};
 function applyTheme(name) {
   document.documentElement.setAttribute("data-theme", name === "custom" ? "pitch" : name);
   localStorage.setItem("soffara_theme", name);
@@ -136,21 +144,26 @@ function applyTheme(name) {
     b.classList.toggle("active", b.dataset.theme === name);
   });
   $("customThemeRow").classList.toggle("hidden", name !== "custom");
-  if (name === "custom") {
-    const saved = localStorage.getItem("soffara_custom_accent") || "#E8B23D";
-    document.documentElement.style.setProperty("--gold", saved);
-    $("customAccentColor").value = saved;
-  } else {
-    document.documentElement.style.removeProperty("--gold");
-  }
+  Object.keys(CUSTOM_COLOR_MAP).forEach((inputId) => {
+    const cssVar = CUSTOM_COLOR_MAP[inputId];
+    if (name === "custom") {
+      const saved = localStorage.getItem(`soffara_custom_${inputId}`) || $(inputId).value;
+      document.documentElement.style.setProperty(cssVar, saved);
+      $(inputId).value = saved;
+    } else {
+      document.documentElement.style.removeProperty(cssVar);
+    }
+  });
 }
 document.querySelectorAll(".theme-swatch").forEach((btn) => {
   btn.addEventListener("click", () => applyTheme(btn.dataset.theme));
 });
-$("customAccentColor").addEventListener("input", (e) => {
-  const val = e.target.value;
-  localStorage.setItem("soffara_custom_accent", val);
-  document.documentElement.style.setProperty("--gold", val);
+Object.keys(CUSTOM_COLOR_MAP).forEach((inputId) => {
+  $(inputId).addEventListener("input", (e) => {
+    const val = e.target.value;
+    localStorage.setItem(`soffara_custom_${inputId}`, val);
+    document.documentElement.style.setProperty(CUSTOM_COLOR_MAP[inputId], val);
+  });
 });
 
 // ---------- tabs ----------
@@ -264,6 +277,58 @@ $("settingsPhotoFile").addEventListener("change", (e) => {
     settingsPhotoData = dataUrl;
     $("profilePhotoPreview").innerHTML = `<img src="${dataUrl}">`;
   });
+});
+
+// ============================================================
+// Google Sign-In (optional — persists profile across devices)
+// ============================================================
+async function findOrCreateProfileForGoogleUser(user) {
+  const snap = await db.collection("profiles").where("auth_uid", "==", user.uid).limit(1).get();
+  if (!snap.empty) {
+    const doc = snap.docs[0];
+    return { id: doc.id, ...doc.data() };
+  }
+  const payload = {
+    device_id: getDeviceId(),
+    auth_uid: user.uid,
+    name: user.displayName || "عضو",
+    phone: null,
+    whatsapp: null,
+    photo_url: user.photoURL || null,
+    positions: [],
+    level: null,
+    is_admin: false,
+    created_at: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  const ref = await db.collection("profiles").add(payload);
+  return { id: ref.id, ...payload };
+}
+$("googleRegisterBtn").addEventListener("click", async () => {
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const result = await auth.signInWithPopup(provider);
+    profile = await findOrCreateProfileForGoogleUser(result.user);
+    setLocalProfile(profile);
+    profilesById[profile.id] = profile;
+    $("registerOverlay").classList.add("hidden");
+    bootAfterAuth();
+  } catch (err) {
+    console.error(err);
+    toast(t("toastGoogleFailed"));
+  }
+});
+$("googleLinkBtn").addEventListener("click", async () => {
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    const result = await auth.signInWithPopup(provider);
+    await db.collection("profiles").doc(profile.id).update({ auth_uid: result.user.uid });
+    profile = { ...profile, auth_uid: result.user.uid };
+    setLocalProfile(profile);
+    toast(t("toastGoogleLinked"));
+  } catch (err) {
+    console.error(err);
+    toast(t("toastGoogleFailed"));
+  }
 });
 
 // ============================================================
