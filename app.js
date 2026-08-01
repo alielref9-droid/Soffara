@@ -183,13 +183,14 @@ Object.keys(CUSTOM_COLOR_MAP).forEach((inputId) => {
 
 // ---------- tabs ----------
 function showView(name) {
-  ["bookings", "chat", "crew", "settings"].forEach((v) => {
+  ["bookings", "chat", "memories", "crew", "settings"].forEach((v) => {
     $(`view-${v}`).classList.toggle("hidden", v !== name);
   });
   document.querySelectorAll(".nav-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.view === name);
   });
   $("fabNewBooking").classList.toggle("hidden", !(name === "bookings" && profile && profile.is_admin));
+  $("fabNewMemory").classList.toggle("hidden", !(name === "memories" && profile));
   if (name === "chat") scrollChatToBottom();
 }
 document.querySelectorAll(".nav-btn").forEach((btn) => {
@@ -892,6 +893,85 @@ async function generateDraw() {
 }
 
 // ============================================================
+// Memories (gallery)
+// ============================================================
+let memoriesCache = [];
+let memoryPhotoData = null;
+
+$("openNewMemoryBtn").addEventListener("click", () => {
+  const select = $("memoryBookingSelect");
+  select.innerHTML = bookingsCache.map((b) => `<option value="${b.id}">${escapeHtml(b.field_name)} — ${b.match_date}</option>`).join("") || `<option value="">-</option>`;
+  memoryPhotoData = null;
+  $("memoryPhotoPreview").innerHTML = "📷";
+  $("memoryPhotoFile").value = "";
+  $("newMemoryOverlay").classList.remove("hidden");
+});
+$("cancelNewMemoryBtn").addEventListener("click", () => $("newMemoryOverlay").classList.add("hidden"));
+$("memoryPhotoFile").addEventListener("change", (e) => {
+  fileToDataUrl(e.target.files[0], (data) => {
+    if (data) { memoryPhotoData = data; $("memoryPhotoPreview").innerHTML = `<img src="${data}">`; }
+  });
+});
+$("submitNewMemoryBtn").addEventListener("click", async () => {
+  const bookingId = $("memoryBookingSelect").value;
+  const booking = bookingsCache.find((b) => b.id === bookingId);
+  if (!bookingId || !booking || !memoryPhotoData) return toast(t("toastMemoryNeedFields"));
+  try {
+    await db.collection("memories").add({
+      booking_id: bookingId,
+      field_name: booking.field_name,
+      match_date: booking.match_date,
+      photo_url: memoryPhotoData,
+      uploaded_by: profile.id,
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    $("newMemoryOverlay").classList.add("hidden");
+    toast(t("toastMemoryAdded"));
+  } catch (err) {
+    console.error(err);
+    toast(t("toastMemoryFailed"));
+  }
+});
+
+function renderMemories() {
+  const list = $("memoriesList");
+  if (!memoriesCache.length) {
+    list.innerHTML = `<div class="empty-state">${t("emptyMemories")}</div>`;
+    return;
+  }
+  const dateFmt = (d) => new Date(d + "T00:00:00").toLocaleDateString(getLang() === "ar" ? "ar-EG" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+  list.innerHTML = memoriesCache.map((m) => `
+    <div class="memory-card">
+      <div class="memory-frame"><img src="${m.photo_url}" loading="lazy"></div>
+      <div class="memory-caption">
+        <div class="mc-field">${escapeHtml(m.field_name || "")}</div>
+        <div class="mc-date">${m.match_date ? dateFmt(m.match_date) : ""}</div>
+      </div>
+      ${profile?.is_admin ? `<button class="memory-delete" data-mem-delete="${m.id}">${t("memoryDeleteBtn")}</button>` : ""}
+    </div>`).join("");
+  list.querySelectorAll("[data-mem-delete]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.confirming === "1") {
+        deleteMemory(btn.dataset.memDelete);
+      } else {
+        btn.dataset.confirming = "1";
+        btn.textContent = t("kickConfirmInline");
+        setTimeout(() => { btn.dataset.confirming = ""; btn.textContent = t("memoryDeleteBtn"); }, 4000);
+      }
+    });
+  });
+}
+async function deleteMemory(id) {
+  try {
+    await db.collection("memories").doc(id).delete();
+    toast(t("toastMemoryDeleted"));
+  } catch (err) {
+    console.error(err);
+    toast(t("toastMemoryFailed"));
+  }
+}
+
+// ============================================================
 // Chat + typing indicator
 // ============================================================
 function chatDateLabel(d) {
@@ -1048,6 +1128,11 @@ function setupRealtime() {
   db.collection("banned").onSnapshot((snap) => {
     bannedCache = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderBannedList();
+  }, (err) => console.error(err));
+
+  db.collection("memories").orderBy("created_at", "desc").onSnapshot((snap) => {
+    memoriesCache = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderMemories();
   }, (err) => console.error(err));
 
   db.collection("bookings").orderBy("match_date", "asc")

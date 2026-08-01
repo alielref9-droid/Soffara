@@ -54,6 +54,12 @@
     </div>
   </div>
 
+  <!-- Memories (gallery) view -->
+  <div class="view hidden" id="view-memories">
+    <div class="section-title" data-i18n="sectionMemories">ذكريات</div>
+    <div id="memoriesList"></div>
+  </div>
+
   <!-- Crew (members directory) view -->
   <div class="view hidden" id="view-crew">
     <div class="section-title" data-i18n="sectionCrew">الشلة</div>
@@ -149,10 +155,16 @@
     <button class="btn-primary" id="openNewBookingBtn"><span data-i18n="newBookingBtn">+ حجز جديد</span></button>
   </div>
 
+  <!-- FAB (new memory, shown on memories tab) -->
+  <div class="fab hidden" id="fabNewMemory">
+    <button class="btn-primary" id="openNewMemoryBtn"><span data-i18n="newMemoryBtn">+ ذكرى جديدة</span></button>
+  </div>
+
   <!-- Bottom nav -->
   <div class="bottom-nav">
     <button class="nav-btn active" data-view="bookings"><span class="icon">📋</span><span data-i18n="navBookings">الحجوزات</span></button>
     <button class="nav-btn" data-view="chat"><span class="icon">💬</span><span data-i18n="navChat">الدردشة</span></button>
+    <button class="nav-btn" data-view="memories"><span class="icon">📸</span><span data-i18n="navMemories">ذكريات</span></button>
     <button class="nav-btn" data-view="crew"><span class="icon">👥</span><span data-i18n="navCrew">الشلة</span></button>
     <button class="nav-btn" data-view="settings"><span class="icon">⚙️</span><span data-i18n="navSettings">الإعدادات</span></button>
   </div>
@@ -233,6 +245,27 @@
       <div class="sheet-actions">
         <button class="btn-secondary" id="cropperCancelBtn" data-i18n="cancelBtn">إلغاء</button>
         <button class="btn-primary btn-block" id="cropperConfirmBtn" data-i18n="useThisPhotoBtn">استخدم الصورة دي</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New memory overlay -->
+  <div class="overlay hidden" id="newMemoryOverlay">
+    <div class="sheet">
+      <div class="sheet-title" data-i18n="newMemoryHeading">ذكرى جديدة</div>
+      <div class="field">
+        <label data-i18n="memoryBookingLabel">مرتبطة بحجز</label>
+        <select id="memoryBookingSelect"></select>
+      </div>
+      <div class="photo-pick">
+        <div class="photo-preview" id="memoryPhotoPreview">📷</div>
+        <div style="flex:1">
+          <div class="field"><input id="memoryPhotoFile" type="file" accept="image/*"></div>
+        </div>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn-secondary" id="cancelNewMemoryBtn" data-i18n="cancelBtn">إلغاء</button>
+        <button class="btn-primary btn-block" id="submitNewMemoryBtn" data-i18n="addMemoryBtn">إضافة</button>
       </div>
     </div>
   </div>

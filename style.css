@@ -303,6 +303,21 @@ html[data-theme="night"] .nav-btn.active { color: var(--gold); }
   font-size: 12px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
 }
 
+/* Memories gallery */
+.memory-card {
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 12px; margin-bottom: 18px;
+}
+.memory-frame {
+  border: 6px solid var(--chalk); outline: 2px solid var(--gold); outline-offset: -8px;
+  border-radius: 10px; overflow: hidden; background: var(--chalk);
+}
+.memory-frame img { width: 100%; display: block; aspect-ratio: 4/3; object-fit: cover; }
+.memory-caption { text-align: center; margin-top: 10px; }
+.memory-caption .mc-field { font-family: var(--font-display); font-weight: 800; font-size: 14.5px; }
+.memory-caption .mc-date { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.memory-delete { display: block; margin: 8px auto 0; background: none; border: none; color: var(--red); font-size: 12px; font-weight: 700; cursor: pointer; }
+
 /* Team draw */
 .draw-source-row { display: flex; gap: 8px; margin-bottom: 14px; }
 .draw-source-btn {
