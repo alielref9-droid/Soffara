@@ -338,6 +338,8 @@ async function handleGoogleRedirectResult() {
     if (!result || !result.user) return;
     localStorage.removeItem("soffara_google_intent");
     if (intent === "register") {
+      const banned = await isBanned({ deviceId: getDeviceId(), email: result.user.email || null });
+      if (banned) { toast(t("toastBanned")); return; }
       profile = await findOrCreateProfileForGoogleUser(result.user);
       setLocalProfile(profile);
       profilesById[profile.id] = profile;
@@ -377,14 +379,32 @@ function reflectGoogleLinkUI() {
 // ============================================================
 let regPhotoData = null;
 
+// ============================================================
+// Ban check (admin can kick + block re-registration with same data)
+// ============================================================
+async function isBanned({ deviceId, phone, whatsapp, email }) {
+  const checks = [];
+  if (deviceId) checks.push(db.collection("banned").where("device_id", "==", deviceId).limit(1).get());
+  if (phone) checks.push(db.collection("banned").where("phone", "==", phone).limit(1).get());
+  if (whatsapp) checks.push(db.collection("banned").where("whatsapp", "==", whatsapp).limit(1).get());
+  if (email) checks.push(db.collection("banned").where("auth_email", "==", email).limit(1).get());
+  if (!checks.length) return false;
+  const results = await Promise.all(checks);
+  return results.some((snap) => !snap.empty);
+}
+
 $("registerBtn").addEventListener("click", async () => {
   const name = $("regName").value.trim();
   if (!name) return toast(t("toastNeedName"));
+  const phone = $("regPhone").value.trim() || null;
+  const whatsapp = $("regWhatsapp").value.trim() || null;
+  const banned = await isBanned({ deviceId: getDeviceId(), phone, whatsapp });
+  if (banned) return toast(t("toastBanned"));
   const payload = {
     device_id: getDeviceId(),
     name,
-    phone: $("regPhone").value.trim() || null,
-    whatsapp: $("regWhatsapp").value.trim() || null,
+    phone,
+    whatsapp,
     photo_url: regPhotoData,
     positions: regSelectedPositions.slice(),
     level: $("regLevel").value || null,
@@ -464,6 +484,7 @@ function reflectAdminUI() {
   $("adminLoggedInBadge").textContent = t("adminBadgeLoggedIn");
   $("adminBadge").innerHTML = isAdmin ? `<span class="admin-badge">${t("adminBadge")}</span>` : "";
   $("fabNewBooking").classList.toggle("hidden", !(isAdmin && !$("view-bookings").classList.contains("hidden")));
+  renderBannedList();
 }
 
 // ============================================================
@@ -520,9 +541,63 @@ async function openProfileView(profileId) {
   if (p.level) rows.push(`<div class="profile-view-row"><span class="label">${t("levelLabel")}</span><span class="value">${dict.levels[p.level]}</span></div>`);
   $("profileViewRows").innerHTML = rows.join("") || `<div class="empty-state">${t("noProfileInfo")}</div>`;
 
+  const kickBtn = $("profileViewKickBtn");
+  const canKick = profile && profile.is_admin && p.id !== profile.id;
+  kickBtn.classList.toggle("hidden", !canKick);
+  kickBtn.onclick = canKick ? () => kickMember(p) : null;
+
   $("profileViewOverlay").classList.remove("hidden");
 }
 $("profileViewCloseBtn").addEventListener("click", () => $("profileViewOverlay").classList.add("hidden"));
+
+async function kickMember(p) {
+  if (!confirm(t("kickConfirm", p.name))) return;
+  try {
+    await db.collection("banned").add({
+      device_id: p.device_id || null,
+      phone: p.phone || null,
+      whatsapp: p.whatsapp || null,
+      auth_email: p.auth_email || null,
+      name: p.name || null,
+      banned_by: profile.id,
+      banned_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection("profiles").doc(p.id).delete();
+    $("profileViewOverlay").classList.add("hidden");
+    toast(t("toastKicked", p.name));
+  } catch (err) {
+    console.error(err);
+    toast(t("toastKickFailed"));
+  }
+}
+
+let bannedCache = [];
+function renderBannedList() {
+  $("bannedCard").classList.toggle("hidden", !(profile && profile.is_admin));
+  const list = $("bannedList");
+  if (!list) return;
+  if (!bannedCache.length) {
+    list.innerHTML = `<div class="empty-state">${t("emptyBanned")}</div>`;
+    return;
+  }
+  list.innerHTML = bannedCache.map((b) => `
+    <div class="banned-row">
+      <span class="banned-row-name">${escapeHtml(b.name || "?")}</span>
+      <button class="unban-btn" data-unban="${b.id}">${t("unbanBtn")}</button>
+    </div>`).join("");
+  list.querySelectorAll("[data-unban]").forEach((btn) => {
+    btn.addEventListener("click", () => unbanMember(btn.dataset.unban));
+  });
+}
+async function unbanMember(banId) {
+  try {
+    await db.collection("banned").doc(banId).delete();
+    toast(t("toastUnbanned"));
+  } catch (err) {
+    console.error(err);
+    toast(t("toastKickFailed"));
+  }
+}
 
 
 $("openNewBookingBtn").addEventListener("click", () => $("newBookingOverlay").classList.remove("hidden"));
@@ -808,6 +883,14 @@ function setupRealtime() {
     crewCache = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
     crewCache.forEach((p) => { profilesById[p.id] = p; });
     renderCrew();
+  }, (err) => {
+    console.error(err);
+    $("crewList").innerHTML = `<div class="empty-state">⚠️ ${escapeHtml(err.message || err.code || String(err))}</div>`;
+  });
+
+  db.collection("banned").onSnapshot((snap) => {
+    bannedCache = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderBannedList();
   }, (err) => console.error(err));
 
   db.collection("bookings").orderBy("match_date", "asc")

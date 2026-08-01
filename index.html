@@ -130,6 +130,11 @@
       </div>
     </div>
 
+    <div class="settings-card hidden" id="bannedCard">
+      <h3 data-i18n="bannedHeading">المحظورين</h3>
+      <div id="bannedList"></div>
+    </div>
+
     <div class="settings-card">
       <h3 data-i18n="aboutHeading">عن التطبيق</h3>
       <div style="font-size:13px;color:var(--ink-soft);line-height:1.9" data-i18n="aboutText">
@@ -238,6 +243,7 @@
         <div class="profile-view-admin hidden" id="profileViewAdminTag" data-i18n="adminBadge">أدمن</div>
       </div>
       <div class="profile-view-rows" id="profileViewRows"></div>
+      <button class="link-danger hidden" id="profileViewKickBtn" style="display:block;width:100%;text-align:center;margin-bottom:12px;padding:8px" data-i18n="kickBtn">اطرد من الشلة</button>
       <button class="btn-secondary btn-block" id="profileViewCloseBtn" data-i18n="closeBtn">إغلاق</button>
     </div>
   </div>
