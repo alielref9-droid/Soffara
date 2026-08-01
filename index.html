@@ -206,7 +206,10 @@
       </div>
       <div class="field-row">
         <div class="field"><label data-i18n="dateLabel">التاريخ *</label><input id="nbDate" type="date"></div>
-        <div class="field"><label data-i18n="timeLabel">الميعاد</label><input id="nbTime" type="time"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label data-i18n="timeFromLabel">من الساعة</label><input id="nbTimeFrom" type="time"></div>
+        <div class="field"><label data-i18n="timeToLabel">لحد الساعة</label><input id="nbTimeTo" type="time"></div>
       </div>
       <div class="field"><label data-i18n="notesLabel">ملاحظات</label><textarea id="nbNotes" rows="2"></textarea></div>
       <div class="sheet-actions">
@@ -231,6 +234,15 @@
         <button class="btn-secondary" id="cropperCancelBtn" data-i18n="cancelBtn">إلغاء</button>
         <button class="btn-primary btn-block" id="cropperConfirmBtn" data-i18n="useThisPhotoBtn">استخدم الصورة دي</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Team draw overlay -->
+  <div class="overlay hidden" id="drawOverlay">
+    <div class="sheet">
+      <div class="sheet-title" data-i18n="drawTitle">قرعة الفرق</div>
+      <div id="drawBody"></div>
+      <button class="btn-secondary btn-block" id="drawCloseBtn" data-i18n="closeBtn" style="margin-top:12px">إغلاق</button>
     </div>
   </div>
 

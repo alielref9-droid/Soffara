@@ -544,14 +544,28 @@ async function openProfileView(profileId) {
   const kickBtn = $("profileViewKickBtn");
   const canKick = profile && profile.is_admin && p.id !== profile.id;
   kickBtn.classList.toggle("hidden", !canKick);
-  kickBtn.onclick = canKick ? () => kickMember(p) : null;
+  kickBtn.dataset.confirming = "";
+  kickBtn.textContent = t("kickBtn");
+  kickBtn.onclick = canKick ? () => {
+    if (kickBtn.dataset.confirming === "1") {
+      kickMember(p);
+    } else {
+      kickBtn.dataset.confirming = "1";
+      kickBtn.textContent = t("kickConfirmInline");
+      setTimeout(() => {
+        if (kickBtn.dataset.confirming === "1") {
+          kickBtn.dataset.confirming = "";
+          kickBtn.textContent = t("kickBtn");
+        }
+      }, 4000);
+    }
+  } : null;
 
   $("profileViewOverlay").classList.remove("hidden");
 }
 $("profileViewCloseBtn").addEventListener("click", () => $("profileViewOverlay").classList.add("hidden"));
 
 async function kickMember(p) {
-  if (!confirm(t("kickConfirm", p.name))) return;
   try {
     await db.collection("banned").add({
       device_id: p.device_id || null,
@@ -603,24 +617,36 @@ async function unbanMember(banId) {
 $("openNewBookingBtn").addEventListener("click", () => $("newBookingOverlay").classList.remove("hidden"));
 $("cancelNewBookingBtn").addEventListener("click", () => $("newBookingOverlay").classList.add("hidden"));
 
+function normalizeDigits(str) {
+  const eastern = "٠١٢٣٤٥٦٧٨٩";
+  const persian = "۰۱۲۳۴۵۶۷۸۹";
+  return String(str).replace(/[٠-٩۰-۹]/g, (d) => {
+    const i1 = eastern.indexOf(d);
+    if (i1 > -1) return i1;
+    const i2 = persian.indexOf(d);
+    if (i2 > -1) return i2;
+    return d;
+  });
+}
 $("submitNewBookingBtn").addEventListener("click", async () => {
   const field_name = $("nbField").value.trim();
   const address = $("nbAddress").value.trim();
-  const price = parseFloat($("nbPrice").value);
-  const capacity = parseInt($("nbCapacity").value, 10);
+  const price = parseFloat(normalizeDigits($("nbPrice").value));
+  const capacity = parseInt(normalizeDigits($("nbCapacity").value), 10);
   const match_date = $("nbDate").value;
-  const match_time = $("nbTime").value || null;
+  const match_time = $("nbTimeFrom").value || null;
+  const match_time_end = $("nbTimeTo").value || null;
   const notes = $("nbNotes").value.trim() || null;
-  if (!field_name || !address || !price || !capacity || !match_date) {
+  if (!field_name || !address || Number.isNaN(price) || Number.isNaN(capacity) || !match_date) {
     return toast(t("toastFillRequired"));
   }
   try {
     await db.collection("bookings").add({
-      field_name, address, price, capacity, match_date, match_time, notes,
+      field_name, address, price, capacity, match_date, match_time, match_time_end, notes,
       created_by: profile.id,
       created_at: firebase.firestore.FieldValue.serverTimestamp(),
     });
-    ["nbField","nbAddress","nbPrice","nbCapacity","nbDate","nbTime","nbNotes"].forEach((id) => $(id).value = "");
+    ["nbField","nbAddress","nbPrice","nbCapacity","nbDate","nbTimeFrom","nbTimeTo","nbNotes"].forEach((id) => $(id).value = "");
     $("newBookingOverlay").classList.add("hidden");
     toast(t("toastBookingOk"));
   } catch (err) {
@@ -677,7 +703,7 @@ async function renderBookings() {
         </div>
         <div class="ticket-meta">
           <span>🗓️ ${dateFmt}</span>
-          ${b.match_time ? `<span>⏰ ${b.match_time.slice(0,5)}</span>` : ""}
+          ${b.match_time ? `<span>⏰ ${b.match_time.slice(0,5)}${b.match_time_end ? ` - ${b.match_time_end.slice(0,5)}` : ""}</span>` : ""}
           <span>👥 ${inList.length}/${b.capacity}</span>
         </div>
         <div class="perforation"></div>
@@ -690,6 +716,7 @@ async function renderBookings() {
           <div class="avatars">${chipRow(inList)}</div>
           ${outList.length ? `<div class="vote-count" style="margin-top:8px">${t("notComingCountLabel", outList.length)}</div><div class="avatars">${chipRow(outList)}</div>` : ""}
           ${b.notes ? `<div class="vote-count" style="margin-top:8px">📝 ${escapeHtml(b.notes)}</div>` : ""}
+          <button class="ticket-draw-btn" data-draw="${b.id}">🎲 ${t("drawBtn")}</button>
         </div>
         ${profile?.is_admin ? `<div class="ticket-admin"><button class="link-danger" data-delete="${b.id}">${t("deleteBookingBtn")}</button></div>` : ""}
       </div>
@@ -701,6 +728,9 @@ async function renderBookings() {
   });
   list.querySelectorAll("[data-delete]").forEach((btn) => {
     btn.addEventListener("click", () => deleteBooking(btn.dataset.delete));
+  });
+  list.querySelectorAll("[data-draw]").forEach((btn) => {
+    btn.addEventListener("click", () => openDrawView(btn.dataset.draw));
   });
 }
 
@@ -732,6 +762,133 @@ async function deleteBooking(id) {
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ============================================================
+// Team draw (lottery)
+// ============================================================
+const LEVEL_WEIGHT = { beginner: 1, mid_level: 2, pro: 3 };
+function levelWeight(level) {
+  return LEVEL_WEIGHT[level] || 2;
+}
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function balanceTeams(participants) {
+  const shuffled = shuffleArray(participants).sort((a, b) => levelWeight(b.level) - levelWeight(a.level));
+  const teamA = [], teamB = [];
+  let sumA = 0, sumB = 0;
+  shuffled.forEach((p) => {
+    const w = levelWeight(p.level);
+    if (sumA <= sumB) { teamA.push(p); sumA += w; } else { teamB.push(p); sumB += w; }
+  });
+  return { teamA, teamB };
+}
+
+let drawBookingId = null;
+let drawSource = "voters";
+let drawCustomSelection = new Set();
+
+async function openDrawView(bookingId) {
+  drawBookingId = bookingId;
+  drawSource = "voters";
+  drawCustomSelection = new Set();
+  await loadAndRenderDraw();
+  $("drawOverlay").classList.remove("hidden");
+}
+$("drawCloseBtn").addEventListener("click", () => $("drawOverlay").classList.add("hidden"));
+
+async function loadAndRenderDraw() {
+  const doc = await db.collection("draws").doc(drawBookingId).get();
+  const existing = doc.exists ? doc.data() : null;
+  renderDrawBody(existing);
+}
+
+function renderDrawBody(existing) {
+  const body = $("drawBody");
+  const isAdmin = profile && profile.is_admin;
+  let html = "";
+
+  if (isAdmin) {
+    html += `
+      <div class="draw-source-row">
+        <button class="draw-source-btn ${drawSource === "voters" ? "active" : ""}" id="drawSrcVoters">${t("drawSourceVoters")}</button>
+        <button class="draw-source-btn ${drawSource === "custom" ? "active" : ""}" id="drawSrcCustom">${t("drawSourceCustom")}</button>
+      </div>`;
+    if (drawSource === "custom") {
+      html += `<div class="draw-pick-list">${crewCache.map((p) => `
+        <div class="draw-pick-row ${drawCustomSelection.has(p.id) ? "checked" : ""}" data-pick="${p.id}">
+          ${avatarHtml(p, "avatar-img")}
+          <span class="draw-pick-name">${escapeHtml(p.name || "?")}</span>
+          <span class="draw-pick-level">${p.level ? window.SOFFARA_I18N[getLang()].levels[p.level] : ""}</span>
+        </div>`).join("")}</div>`;
+    }
+    html += `<button class="btn-primary btn-block" id="drawGenerateBtn">🎲 ${t("drawGenerateBtn")}</button>`;
+  }
+
+  if (existing && existing.team_a && existing.team_b) {
+    const renderTeam = (team, label) => `
+      <div class="draw-team">
+        <h4>${label}</h4>
+        ${team.map((m) => `<div class="draw-team-member">${avatarHtml(profilesById[m.id] || m, "avatar-img")}<span>${escapeHtml(m.name || "?")}</span></div>`).join("") || `<div class="empty-state" style="padding:10px">-</div>`}
+      </div>`;
+    html += `<div class="draw-teams">${renderTeam(existing.team_a, t("teamA"))}${renderTeam(existing.team_b, t("teamB"))}</div>`;
+    const when = existing.created_at && existing.created_at.toDate ? existing.created_at.toDate() : null;
+    html += `<div class="draw-meta">${when ? t("drawMadeAt", when.toLocaleString(getLang() === "ar" ? "ar-EG" : "en-GB")) : ""}</div>`;
+  } else if (!isAdmin) {
+    html += `<div class="empty-state">${t("noDrawYet")}</div>`;
+  }
+
+  body.innerHTML = html;
+
+  if (isAdmin) {
+    $("drawSrcVoters")?.addEventListener("click", () => { drawSource = "voters"; loadAndRenderDraw(); });
+    $("drawSrcCustom")?.addEventListener("click", () => { drawSource = "custom"; loadAndRenderDraw(); });
+    body.querySelectorAll("[data-pick]").forEach((row) => {
+      row.addEventListener("click", () => {
+        const id = row.dataset.pick;
+        if (drawCustomSelection.has(id)) drawCustomSelection.delete(id); else drawCustomSelection.add(id);
+        loadAndRenderDraw();
+      });
+    });
+    $("drawGenerateBtn")?.addEventListener("click", generateDraw);
+  }
+}
+
+async function generateDraw() {
+  let participantIds = [];
+  if (drawSource === "voters") {
+    const votes = votesCache[drawBookingId] || [];
+    participantIds = votes.filter((v) => v.status === "coming").map((v) => v.profile_id);
+  } else {
+    participantIds = Array.from(drawCustomSelection);
+  }
+  if (participantIds.length < 2) return toast(t("toastDrawNeedMore"));
+
+  const participants = participantIds.map((id) => {
+    const p = profilesById[id] || { id, name: "?" };
+    return { id, name: p.name, level: p.level || null };
+  });
+  const { teamA, teamB } = balanceTeams(participants);
+  try {
+    await db.collection("draws").doc(drawBookingId).set({
+      team_a: teamA,
+      team_b: teamB,
+      source: drawSource,
+      created_by: profile.id,
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    toast(t("toastDrawDone"));
+    loadAndRenderDraw();
+  } catch (err) {
+    console.error(err);
+    toast(t("toastKickFailed"));
+  }
 }
 
 // ============================================================
