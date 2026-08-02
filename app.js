@@ -102,6 +102,7 @@ function setLocalProfile(p) {
 
 let profile = getLocalProfile();
 let bookingsCache = [];
+let chatMessagesCache = [];
 let profilesById = {};
 let votesCache = {};
 
@@ -182,6 +183,38 @@ Object.keys(CUSTOM_COLOR_MAP).forEach((inputId) => {
 });
 
 // ---------- tabs ----------
+// ---------- unread badges + chat mute ----------
+function getLastSeen(key) {
+  const v = localStorage.getItem(`soffara_last_seen_${key}`);
+  return v ? new Date(v) : new Date(0);
+}
+function setLastSeen(key) {
+  localStorage.setItem(`soffara_last_seen_${key}`, new Date().toISOString());
+}
+function isChatMuted() {
+  return localStorage.getItem("soffara_chat_muted") === "1";
+}
+function toDateSafe(ts) {
+  return ts && ts.toDate ? ts.toDate() : new Date(0);
+}
+function updateBadges() {
+  const lastBookings = getLastSeen("bookings");
+  const unreadBookings = bookingsCache.filter((b) => toDateSafe(b.created_at) > lastBookings).length;
+  const bBadge = $("badgeBookings");
+  bBadge.textContent = unreadBookings > 9 ? "9+" : String(unreadBookings);
+  bBadge.classList.toggle("hidden", unreadBookings === 0);
+
+  const lastChat = getLastSeen("chat");
+  const unreadChat = isChatMuted() ? 0 : (chatMessagesCache || []).filter((m) => m.profile_id !== profile?.id && toDateSafe(m.created_at) > lastChat).length;
+  const cBadge = $("badgeChat");
+  cBadge.textContent = unreadChat > 9 ? "9+" : String(unreadChat);
+  cBadge.classList.toggle("hidden", unreadChat === 0);
+}
+$("muteChatToggle").addEventListener("change", (e) => {
+  localStorage.setItem("soffara_chat_muted", e.target.checked ? "1" : "0");
+  updateBadges();
+});
+
 function showView(name) {
   ["bookings", "chat", "memories", "crew", "settings"].forEach((v) => {
     $(`view-${v}`).classList.toggle("hidden", v !== name);
@@ -192,6 +225,10 @@ function showView(name) {
   $("fabNewBooking").classList.toggle("hidden", !(name === "bookings" && profile && profile.is_admin));
   $("fabNewMemory").classList.toggle("hidden", !(name === "memories" && profile));
   if (name === "chat") scrollChatToBottom();
+  if (name === "bookings" || name === "chat") {
+    setLastSeen(name);
+    updateBadges();
+  }
 }
 document.querySelectorAll(".nav-btn").forEach((btn) => {
   btn.addEventListener("click", () => showView(btn.dataset.view));
@@ -438,6 +475,7 @@ function fillSettingsForm() {
   renderPositionPickers();
   $("settingsLevel").value = profile.level || "";
   reflectGoogleLinkUI();
+  $("muteChatToggle").checked = isChatMuted();
 }
 $("saveProfileBtn").addEventListener("click", async () => {
   const updates = {
@@ -898,29 +936,45 @@ async function generateDraw() {
 let memoriesCache = [];
 let memoryPhotoData = null;
 
+function updateMemoryPreviewText() {
+  const fieldVal = $("memoryFieldNameInput").value.trim();
+  const dateVal = $("memoryDateInput").value;
+  $("memoryPreviewField").textContent = fieldVal || t("memoryFieldNameLabel");
+  $("memoryPreviewDate").textContent = dateVal
+    ? new Date(dateVal + "T00:00:00").toLocaleDateString(getLang() === "ar" ? "ar-EG" : "en-GB", { day: "numeric", month: "long", year: "numeric" })
+    : t("memoryDateLabel");
+}
 $("openNewMemoryBtn").addEventListener("click", () => {
-  const select = $("memoryBookingSelect");
-  select.innerHTML = bookingsCache.map((b) => `<option value="${b.id}">${escapeHtml(b.field_name)} — ${b.match_date}</option>`).join("") || `<option value="">-</option>`;
   memoryPhotoData = null;
   $("memoryPhotoPreview").innerHTML = "📷";
-  $("memoryPhotoFile").value = "";
+  $("memoryPhotoFileCamera").value = "";
+  $("memoryPhotoFileUpload").value = "";
+  $("memoryFieldNameInput").value = "";
+  $("memoryDateInput").value = new Date().toISOString().slice(0, 10);
+  updateMemoryPreviewText();
   $("newMemoryOverlay").classList.remove("hidden");
 });
 $("cancelNewMemoryBtn").addEventListener("click", () => $("newMemoryOverlay").classList.add("hidden"));
-$("memoryPhotoFile").addEventListener("change", (e) => {
-  fileToDataUrl(e.target.files[0], (data) => {
+$("memoryCameraBtn").addEventListener("click", () => $("memoryPhotoFileCamera").click());
+$("memoryUploadBtn").addEventListener("click", () => $("memoryPhotoFileUpload").click());
+function handleMemoryFile(file) {
+  fileToDataUrl(file, (data) => {
     if (data) { memoryPhotoData = data; $("memoryPhotoPreview").innerHTML = `<img src="${data}">`; }
   });
-});
+}
+$("memoryPhotoFileCamera").addEventListener("change", (e) => handleMemoryFile(e.target.files[0]));
+$("memoryPhotoFileUpload").addEventListener("change", (e) => handleMemoryFile(e.target.files[0]));
+$("memoryFieldNameInput").addEventListener("input", updateMemoryPreviewText);
+$("memoryDateInput").addEventListener("input", updateMemoryPreviewText);
+
 $("submitNewMemoryBtn").addEventListener("click", async () => {
-  const bookingId = $("memoryBookingSelect").value;
-  const booking = bookingsCache.find((b) => b.id === bookingId);
-  if (!bookingId || !booking || !memoryPhotoData) return toast(t("toastMemoryNeedFields"));
+  const field_name = $("memoryFieldNameInput").value.trim();
+  const match_date = $("memoryDateInput").value;
+  if (!field_name || !match_date || !memoryPhotoData) return toast(t("toastMemoryNeedFields"));
   try {
     await db.collection("memories").add({
-      booking_id: bookingId,
-      field_name: booking.field_name,
-      match_date: booking.match_date,
+      field_name,
+      match_date,
       photo_url: memoryPhotoData,
       uploaded_by: profile.id,
       created_at: firebase.firestore.FieldValue.serverTimestamp(),
@@ -940,15 +994,17 @@ function renderMemories() {
     return;
   }
   const dateFmt = (d) => new Date(d + "T00:00:00").toLocaleDateString(getLang() === "ar" ? "ar-EG" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
-  list.innerHTML = memoriesCache.map((m) => `
-    <div class="memory-card">
-      <div class="memory-frame"><img src="${m.photo_url}" loading="lazy"></div>
-      <div class="memory-caption">
-        <div class="mc-field">${escapeHtml(m.field_name || "")}</div>
-        <div class="mc-date">${m.match_date ? dateFmt(m.match_date) : ""}</div>
+  list.innerHTML = `<div class="memories-grid">${memoriesCache.map((m) => `
+    <div class="memory-item">
+      <div class="memory-frame">
+        <div class="memory-photo-slot"><img src="${m.photo_url}" loading="lazy"></div>
+        <div class="memory-caption-in-frame">
+          <div class="mc-field">${escapeHtml(m.field_name || "")}</div>
+          <div class="mc-date">${m.match_date ? dateFmt(m.match_date) : ""}</div>
+        </div>
       </div>
       ${profile?.is_admin ? `<button class="memory-delete" data-mem-delete="${m.id}">${t("memoryDeleteBtn")}</button>` : ""}
-    </div>`).join("");
+    </div>`).join("")}</div>`;
   list.querySelectorAll("[data-mem-delete]").forEach((btn) => {
     btn.addEventListener("click", () => {
       if (btn.dataset.confirming === "1") {
@@ -1139,6 +1195,7 @@ function setupRealtime() {
     .onSnapshot((snap) => {
       bookingsCache = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       renderBookings();
+      updateBadges();
     }, (err) => console.error(err));
 
   db.collection("votes").onSnapshot(() => {
@@ -1149,7 +1206,9 @@ function setupRealtime() {
     .onSnapshot(async (snap) => {
       const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       await Promise.all(msgs.map((m) => ensureProfileCached(m.profile_id)));
+      chatMessagesCache = msgs;
       renderMessages(msgs);
+      updateBadges();
     }, (err) => console.error(err));
 
   db.collection("typing").onSnapshot((snap) => {

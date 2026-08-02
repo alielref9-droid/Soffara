@@ -142,6 +142,17 @@
     </div>
 
     <div class="settings-card">
+      <h3 data-i18n="notifHeading">الإشعارات</h3>
+      <div class="mute-row">
+        <span data-i18n="muteChatLabel">كتم إشعارات الدردشة</span>
+        <label class="switch">
+          <input type="checkbox" id="muteChatToggle">
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="settings-card">
       <h3 data-i18n="aboutHeading">عن التطبيق</h3>
       <div style="font-size:13px;color:var(--ink-soft);line-height:1.9" data-i18n="aboutText">
         صفارة — تطبيق شلة الكورة لحجز الملاعب والتصويت والدردشة.<br>
@@ -162,8 +173,8 @@
 
   <!-- Bottom nav -->
   <div class="bottom-nav">
-    <button class="nav-btn active" data-view="bookings"><span class="icon">📋</span><span data-i18n="navBookings">الحجوزات</span></button>
-    <button class="nav-btn" data-view="chat"><span class="icon">💬</span><span data-i18n="navChat">الدردشة</span></button>
+    <button class="nav-btn active" data-view="bookings"><span class="icon">📋<span class="nav-badge hidden" id="badgeBookings"></span></span><span data-i18n="navBookings">الحجوزات</span></button>
+    <button class="nav-btn" data-view="chat"><span class="icon">💬<span class="nav-badge hidden" id="badgeChat"></span></span><span data-i18n="navChat">الدردشة</span></button>
     <button class="nav-btn" data-view="memories"><span class="icon">📸</span><span data-i18n="navMemories">ذكريات</span></button>
     <button class="nav-btn" data-view="crew"><span class="icon">👥</span><span data-i18n="navCrew">الشلة</span></button>
     <button class="nav-btn" data-view="settings"><span class="icon">⚙️</span><span data-i18n="navSettings">الإعدادات</span></button>
@@ -253,16 +264,23 @@
   <div class="overlay hidden" id="newMemoryOverlay">
     <div class="sheet">
       <div class="sheet-title" data-i18n="newMemoryHeading">ذكرى جديدة</div>
-      <div class="field">
-        <label data-i18n="memoryBookingLabel">مرتبطة بحجز</label>
-        <select id="memoryBookingSelect"></select>
-      </div>
-      <div class="photo-pick">
-        <div class="photo-preview" id="memoryPhotoPreview">📷</div>
-        <div style="flex:1">
-          <div class="field"><input id="memoryPhotoFile" type="file" accept="image/*"></div>
+      <div class="memory-preview-wrap">
+        <div class="memory-frame memory-frame-preview">
+          <div class="memory-photo-slot" id="memoryPhotoPreview">📷</div>
+          <div class="memory-caption-in-frame">
+            <div class="mc-field" id="memoryPreviewField">اسم الملعب</div>
+            <div class="mc-date" id="memoryPreviewDate">التاريخ</div>
+          </div>
         </div>
       </div>
+      <div class="photo-source-row">
+        <button type="button" class="btn-secondary" id="memoryCameraBtn">📷 <span data-i18n="takePhotoBtn">التقط بالكاميرا</span></button>
+        <button type="button" class="btn-secondary" id="memoryUploadBtn">🖼️ <span data-i18n="uploadPhotoBtn">ارفع صورة</span></button>
+      </div>
+      <input id="memoryPhotoFileCamera" type="file" accept="image/*" capture="environment" class="hidden">
+      <input id="memoryPhotoFileUpload" type="file" accept="image/*" class="hidden">
+      <div class="field"><label data-i18n="memoryFieldNameLabel">اسم الملعب</label><input id="memoryFieldNameInput" type="text" placeholder="مثال: ملعب النادي الأهلي"></div>
+      <div class="field"><label data-i18n="memoryDateLabel">التاريخ</label><input id="memoryDateInput" type="date"></div>
       <div class="sheet-actions">
         <button class="btn-secondary" id="cancelNewMemoryBtn" data-i18n="cancelBtn">إلغاء</button>
         <button class="btn-primary btn-block" id="submitNewMemoryBtn" data-i18n="addMemoryBtn">إضافة</button>
