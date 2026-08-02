@@ -373,18 +373,36 @@ async function handleGoogleRedirectResult() {
   if (!intent) return;
   try {
     const result = await auth.getRedirectResult();
-    if (!result || !result.user) return;
+    if (result && result.user) {
+      await completeGoogleFlow(intent, result.user);
+    }
+  } catch (err) {
+    console.error(err);
     localStorage.removeItem("soffara_google_intent");
+    toast(t("toastGoogleFailed"));
+  }
+}
+// Fallback: some mobile/TWA browsers miss getRedirectResult() but still fire this reliably.
+auth.onAuthStateChanged(async (user) => {
+  const intent = localStorage.getItem("soffara_google_intent");
+  if (!user || !intent) return;
+  await completeGoogleFlow(intent, user);
+});
+async function completeGoogleFlow(intent, user) {
+  const stillPending = localStorage.getItem("soffara_google_intent") === intent;
+  if (!stillPending) return;
+  localStorage.removeItem("soffara_google_intent");
+  try {
     if (intent === "register") {
-      const banned = await isBanned({ deviceId: getDeviceId(), email: result.user.email || null });
+      const banned = await isBanned({ deviceId: getDeviceId(), email: user.email || null });
       if (banned) { toast(t("toastBanned")); return; }
-      profile = await findOrCreateProfileForGoogleUser(result.user);
+      profile = await findOrCreateProfileForGoogleUser(user);
       setLocalProfile(profile);
       profilesById[profile.id] = profile;
       $("registerOverlay").classList.add("hidden");
       bootAfterAuth();
     } else if (intent === "link" && profile) {
-      const updates = { auth_uid: result.user.uid, auth_email: result.user.email || null };
+      const updates = { auth_uid: user.uid, auth_email: user.email || null };
       await db.collection("profiles").doc(profile.id).update(updates);
       profile = { ...profile, ...updates };
       setLocalProfile(profile);
@@ -394,7 +412,6 @@ async function handleGoogleRedirectResult() {
     }
   } catch (err) {
     console.error(err);
-    localStorage.removeItem("soffara_google_intent");
     toast(t("toastGoogleFailed"));
   }
 }
