@@ -223,7 +223,7 @@ function showView(name) {
     b.classList.toggle("active", b.dataset.view === name);
   });
   $("fabNewBooking").classList.toggle("hidden", !(name === "bookings" && profile && profile.is_admin));
-  $("fabNewMemory").classList.toggle("hidden", !(name === "memories" && profile));
+  $("fabNewMemory").classList.toggle("hidden", !(name === "memories" && profile && profile.is_admin));
   if (name === "chat") scrollChatToBottom();
   if (name === "bookings" || name === "chat") {
     setLastSeen(name);
@@ -395,7 +395,21 @@ async function completeGoogleFlow(intent, user) {
   try {
     if (intent === "register") {
       const banned = await isBanned({ deviceId: getDeviceId(), email: user.email || null });
-      if (banned) { toast(t("toastBanned")); return; }
+      if (banned) {
+        await submitRejoinRequest({
+          device_id: getDeviceId(),
+          auth_uid: user.uid,
+          auth_email: user.email || null,
+          name: user.displayName || "عضو",
+          phone: null,
+          whatsapp: null,
+          photo_url: user.photoURL || null,
+          positions: [],
+          level: null,
+          is_admin: false,
+        });
+        return;
+      }
       profile = await findOrCreateProfileForGoogleUser(user);
       setLocalProfile(profile);
       profilesById[profile.id] = profile;
@@ -429,6 +443,21 @@ function reflectGoogleLinkUI() {
   }
 }
 
+$("signOutBtn").addEventListener("click", () => {
+  if ($("signOutBtn").dataset.confirming === "1") {
+    localStorage.removeItem("soffara_profile");
+    auth.signOut().catch(() => {});
+    location.reload();
+  } else {
+    $("signOutBtn").dataset.confirming = "1";
+    $("signOutBtn").textContent = t("confirmSignOutInline");
+    setTimeout(() => {
+      $("signOutBtn").dataset.confirming = "";
+      $("signOutBtn").textContent = t("signOutBtn");
+    }, 4000);
+  }
+});
+
 // ============================================================
 // Registration
 // ============================================================
@@ -453,8 +482,6 @@ $("registerBtn").addEventListener("click", async () => {
   if (!name) return toast(t("toastNeedName"));
   const phone = $("regPhone").value.trim() || null;
   const whatsapp = $("regWhatsapp").value.trim() || null;
-  const banned = await isBanned({ deviceId: getDeviceId(), phone, whatsapp });
-  if (banned) return toast(t("toastBanned"));
   const payload = {
     device_id: getDeviceId(),
     name,
@@ -464,10 +491,13 @@ $("registerBtn").addEventListener("click", async () => {
     positions: regSelectedPositions.slice(),
     level: $("regLevel").value || null,
     is_admin: false,
-    created_at: firebase.firestore.FieldValue.serverTimestamp(),
   };
+  const banned = await isBanned({ deviceId: getDeviceId(), phone, whatsapp });
+  if (banned) {
+    return submitRejoinRequest(payload);
+  }
   try {
-    const ref = await db.collection("profiles").add(payload);
+    const ref = await db.collection("profiles").add({ ...payload, created_at: firebase.firestore.FieldValue.serverTimestamp() });
     profile = { id: ref.id, ...payload };
     setLocalProfile(profile);
     $("registerOverlay").classList.add("hidden");
@@ -477,6 +507,99 @@ $("registerBtn").addEventListener("click", async () => {
     toast(t("toastRegFailed"));
   }
 });
+
+// ============================================================
+// Rejoin requests (banned person asks the admin to let them back in)
+// ============================================================
+let rejoinListenerUnsub = null;
+async function submitRejoinRequest(payload) {
+  try {
+    const ref = await db.collection("rejoin_requests").add({
+      ...payload,
+      status: "pending",
+      requested_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    $("registerOverlay").classList.add("hidden");
+    $("rejoinWaitingTitle").textContent = t("rejoinWaitingTitle");
+    $("rejoinWaitingText").textContent = t("rejoinWaitingText");
+    $("rejoinCloseBtn").classList.add("hidden");
+    $("rejoinWaitingOverlay").classList.remove("hidden");
+    if (rejoinListenerUnsub) rejoinListenerUnsub();
+    rejoinListenerUnsub = db.collection("rejoin_requests").doc(ref.id).onSnapshot(async (doc) => {
+      const data = doc.data();
+      if (!data) return;
+      if (data.status === "approved" && data.profile_id) {
+        const pdoc = await db.collection("profiles").doc(data.profile_id).get();
+        if (pdoc.exists) {
+          profile = { id: pdoc.id, ...pdoc.data() };
+          setLocalProfile(profile);
+          rejoinListenerUnsub();
+          $("rejoinWaitingOverlay").classList.add("hidden");
+          bootAfterAuth();
+        }
+      } else if (data.status === "denied") {
+        $("rejoinWaitingTitle").textContent = t("rejoinDeniedTitle");
+        $("rejoinWaitingText").textContent = t("rejoinDeniedText");
+        $("rejoinCloseBtn").classList.remove("hidden");
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    toast(t("toastRegFailed"));
+  }
+}
+$("rejoinCloseBtn").addEventListener("click", () => {
+  if (rejoinListenerUnsub) rejoinListenerUnsub();
+  $("rejoinWaitingOverlay").classList.add("hidden");
+  $("registerOverlay").classList.remove("hidden");
+});
+
+let rejoinRequestsCache = [];
+function renderRejoinRequests() {
+  $("rejoinRequestsCard").classList.toggle("hidden", !(profile && profile.is_admin) || !rejoinRequestsCache.length);
+  const list = $("rejoinRequestsList");
+  if (!list) return;
+  list.innerHTML = rejoinRequestsCache.map((r) => `
+    <div class="rejoin-row">
+      <div class="rejoin-row-name">${escapeHtml(r.name || "?")}${r.phone ? ` · ${escapeHtml(r.phone)}` : ""}</div>
+      <div class="rejoin-row-actions">
+        <button class="rejoin-accept-btn" data-accept="${r.id}">${t("rejoinAcceptBtn")}</button>
+        <button class="rejoin-deny-btn" data-deny="${r.id}">${t("rejoinDenyBtn")}</button>
+      </div>
+    </div>`).join("");
+  list.querySelectorAll("[data-accept]").forEach((btn) => btn.addEventListener("click", () => acceptRejoin(btn.dataset.accept)));
+  list.querySelectorAll("[data-deny]").forEach((btn) => btn.addEventListener("click", () => denyRejoin(btn.dataset.deny)));
+}
+async function acceptRejoin(id) {
+  try {
+    const doc = await db.collection("rejoin_requests").doc(id).get();
+    const r = doc.data();
+    const { status, requested_at, ...profilePayload } = r;
+    const ref = await db.collection("profiles").add({ ...profilePayload, created_at: firebase.firestore.FieldValue.serverTimestamp() });
+    const banSnaps = await Promise.all([
+      r.device_id ? db.collection("banned").where("device_id", "==", r.device_id).get() : null,
+      r.phone ? db.collection("banned").where("phone", "==", r.phone).get() : null,
+      r.whatsapp ? db.collection("banned").where("whatsapp", "==", r.whatsapp).get() : null,
+    ].filter(Boolean));
+    const delOps = [];
+    banSnaps.forEach((snap) => snap.docs.forEach((d) => delOps.push(d.ref.delete())));
+    await Promise.all(delOps);
+    await db.collection("rejoin_requests").doc(id).update({ status: "approved", profile_id: ref.id });
+    toast(t("toastRejoinAccepted"));
+  } catch (err) {
+    console.error(err);
+    toast(t("toastKickFailed"));
+  }
+}
+async function denyRejoin(id) {
+  try {
+    await db.collection("rejoin_requests").doc(id).update({ status: "denied" });
+    toast(t("toastRejoinDenied"));
+  } catch (err) {
+    console.error(err);
+    toast(t("toastKickFailed"));
+  }
+}
 
 // ============================================================
 // Settings / profile edit
@@ -541,6 +664,7 @@ function reflectAdminUI() {
   $("adminBadge").innerHTML = isAdmin ? `<span class="admin-badge">${t("adminBadge")}</span>` : "";
   $("fabNewBooking").classList.toggle("hidden", !(isAdmin && !$("view-bookings").classList.contains("hidden")));
   renderBannedList();
+  renderRejoinRequests();
 }
 
 // ============================================================
@@ -783,7 +907,15 @@ async function renderBookings() {
     btn.addEventListener("click", () => castVote(btn.dataset.booking, btn.dataset.status));
   });
   list.querySelectorAll("[data-delete]").forEach((btn) => {
-    btn.addEventListener("click", () => deleteBooking(btn.dataset.delete));
+    btn.addEventListener("click", () => {
+      if (btn.dataset.confirming === "1") {
+        deleteBooking(btn.dataset.delete);
+      } else {
+        btn.dataset.confirming = "1";
+        btn.textContent = t("confirmDeleteBookingInline");
+        setTimeout(() => { btn.dataset.confirming = ""; btn.textContent = t("deleteBookingBtn"); }, 4000);
+      }
+    });
   });
   list.querySelectorAll("[data-draw]").forEach((btn) => {
     btn.addEventListener("click", () => openDrawView(btn.dataset.draw));
@@ -804,7 +936,6 @@ async function castVote(bookingId, status) {
 }
 
 async function deleteBooking(id) {
-  if (!confirm(t("confirmDeleteBooking"))) return;
   try {
     await db.collection("bookings").doc(id).delete();
     const votesSnap = await db.collection("votes").where("booking_id", "==", id).get();
@@ -962,6 +1093,7 @@ function updateMemoryPreviewText() {
     : t("memoryDateLabel");
 }
 $("openNewMemoryBtn").addEventListener("click", () => {
+  if (!profile || !profile.is_admin) return;
   memoryPhotoData = null;
   $("memoryPhotoPreview").innerHTML = "📷";
   $("memoryPhotoFileCamera").value = "";
@@ -1028,7 +1160,7 @@ function renderMemories() {
         deleteMemory(btn.dataset.memDelete);
       } else {
         btn.dataset.confirming = "1";
-        btn.textContent = t("kickConfirmInline");
+        btn.textContent = t("confirmDeleteMemoryInline");
         setTimeout(() => { btn.dataset.confirming = ""; btn.textContent = t("memoryDeleteBtn"); }, 4000);
       }
     });
@@ -1201,6 +1333,11 @@ function setupRealtime() {
   db.collection("banned").onSnapshot((snap) => {
     bannedCache = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderBannedList();
+  }, (err) => console.error(err));
+
+  db.collection("rejoin_requests").where("status", "==", "pending").onSnapshot((snap) => {
+    rejoinRequestsCache = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderRejoinRequests();
   }, (err) => console.error(err));
 
   db.collection("memories").orderBy("created_at", "desc").onSnapshot((snap) => {

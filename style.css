@@ -190,6 +190,16 @@ button, input, textarea, select { font-family: inherit; }
   transform: translateX(50%);
   max-width: 480px;
 }
+.fab.fab-mini {
+  inset-inline-end: 20px; inset-inline-start: auto;
+  transform: none; bottom: 100px;
+}
+.btn-fab-round {
+  width: 54px; height: 54px; border-radius: 50%;
+  background: var(--gold); color: var(--pitch-dark); border: none;
+  font-size: 26px; font-weight: 800; line-height: 1; cursor: pointer;
+  box-shadow: var(--shadow); display: flex; align-items: center; justify-content: center;
+}
 .btn-primary {
   background: var(--gold); color: var(--pitch-dark);
   border: none; font-weight: 800; font-family: var(--font-display);
@@ -302,6 +312,16 @@ html[data-theme="night"] .nav-btn.active { color: var(--gold); }
   background: var(--green-ok); color: #fff; border: none; font-weight: 700;
   font-size: 12px; padding: 6px 12px; border-radius: 999px; cursor: pointer;
 }
+.rejoin-row {
+  background: var(--chalk); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px;
+}
+.rejoin-row-name { font-size: 13.5px; font-weight: 800; margin-bottom: 6px; }
+.rejoin-row-actions { display: flex; gap: 8px; }
+.rejoin-accept-btn, .rejoin-deny-btn {
+  flex: 1; border: none; font-weight: 700; font-size: 12px; padding: 7px 10px; border-radius: 999px; cursor: pointer;
+}
+.rejoin-accept-btn { background: var(--green-ok); color: #fff; }
+.rejoin-deny-btn { background: var(--red); color: #fff; }
 
 .mute-row { display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; font-weight: 700; }
 .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
