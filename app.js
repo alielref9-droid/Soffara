@@ -241,22 +241,29 @@ let cropperState = { scale: 1, x: 0, y: 0, naturalW: 0, naturalH: 0, onConfirm: 
 
 function openCropper(file, onConfirm) {
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    const img = $("cropperImg");
-    img.onload = () => {
-      cropperState = {
-        scale: 1, x: 0, y: 0,
-        naturalW: img.naturalWidth, naturalH: img.naturalHeight,
-        onConfirm,
+  try {
+    const reader = new FileReader();
+    reader.onerror = () => { console.error("Cropper FileReader error"); toast(t("toastPhotoTooBig")); };
+    reader.onload = () => {
+      const img = $("cropperImg");
+      img.onerror = () => { console.error("Cropper image failed to load"); toast(t("toastPhotoTooBig")); };
+      img.onload = () => {
+        cropperState = {
+          scale: 1, x: 0, y: 0,
+          naturalW: img.naturalWidth, naturalH: img.naturalHeight,
+          onConfirm,
+        };
+        fitCropperImage();
+        $("cropperZoom").value = 1;
+        $("cropperOverlay").classList.remove("hidden");
       };
-      fitCropperImage();
-      $("cropperZoom").value = 1;
-      $("cropperOverlay").classList.remove("hidden");
+      img.src = reader.result;
     };
-    img.src = reader.result;
-  };
-  reader.readAsDataURL(file);
+    reader.readAsDataURL(file);
+  } catch (err) {
+    console.error("openCropper failed", err);
+    toast(t("toastPhotoTooBig"));
+  }
 }
 function fitCropperImage() {
   const vp = 220;
@@ -1106,6 +1113,18 @@ $("openNewMemoryBtn").addEventListener("click", () => {
 $("cancelNewMemoryBtn").addEventListener("click", () => $("newMemoryOverlay").classList.add("hidden"));
 $("memoryCameraBtn").addEventListener("click", () => $("memoryPhotoFileCamera").click());
 $("memoryUploadBtn").addEventListener("click", () => $("memoryPhotoFileUpload").click());
+function fileToDataUrl(file, cb) {
+  if (!file) return cb(null);
+  if (file.size > 900 * 1024) {
+    toast(t("toastPhotoTooBig"));
+    return cb(null);
+  }
+  const reader = new FileReader();
+  reader.onload = () => cb(reader.result);
+  reader.onerror = () => { console.error("FileReader error"); cb(null); };
+  reader.readAsDataURL(file);
+}
+
 function handleMemoryFile(file) {
   fileToDataUrl(file, (data) => {
     if (data) { memoryPhotoData = data; $("memoryPhotoPreview").innerHTML = `<img src="${data}">`; }
