@@ -276,14 +276,30 @@ html[data-theme="night"] .nav-btn.active { color: var(--gold); }
 .field-row .field { flex: 1; }
 .sheet-actions { display: flex; gap: 10px; margin-top: 16px; }
 .photo-pick {
-  display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
 }
 .photo-preview {
   width: 58px; height: 58px; border-radius: 50%; background: var(--card);
   border: 2px dashed var(--pitch-line); display: grid; place-items: center;
   overflow: hidden; font-size: 22px; color: var(--ink-soft);
+  padding: 0; cursor: pointer; flex-shrink: 0;
 }
 .photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+.photo-choose-btn { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 14px; }
+
+.list-item-card { padding: 0; overflow: hidden; cursor: pointer; }
+.profile-summary-row {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+}
+.profile-summary-row .photo-preview { pointer-events: none; }
+.profile-summary-name { flex: 1; font-weight: 800; font-size: 15px; }
+.profile-summary-row .chevron { font-size: 20px; color: var(--ink-soft); transform: scaleX(-1); }
+
+.avatar-preview-frame {
+  width: 180px; height: 180px; border-radius: 50%; overflow: hidden;
+  margin: 0 auto 18px; border: 3px solid var(--gold); background: var(--card);
+}
+.avatar-preview-frame img { width: 100%; height: 100%; object-fit: cover; }
 
 /* ===================== Settings ===================== */
 .settings-card {
@@ -536,4 +552,10 @@ html[data-theme="night"] .msg-quote .qname { color: var(--gold); }
 .cropper-viewport img {
   position: absolute; top: 50%; left: 50%; max-width: none;
   transform-origin: center center; user-select: none; -webkit-user-drag: none;
+}
+#cropperConfirmBtn {
+  background: #2E8B57 !important; color: #fff !important; border-color: #2E8B57 !important;
+}
+#cropperCancelBtn {
+  background: #fff !important; color: #14261C !important; border-color: #ccc !important;
 }

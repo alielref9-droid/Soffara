@@ -326,6 +326,9 @@ $("cropperConfirmBtn").addEventListener("click", () => {
   $("cropperOverlay").classList.add("hidden");
 });
 
+$("regPhotoChooseBtn").addEventListener("click", () => $("regPhotoFile").click());
+$("settingsPhotoChooseBtn").addEventListener("click", () => $("settingsPhotoFile").click());
+
 $("regPhotoFile").addEventListener("change", (e) => {
   openCropper(e.target.files[0], (dataUrl) => {
     regPhotoData = dataUrl;
@@ -338,6 +341,29 @@ $("settingsPhotoFile").addEventListener("change", (e) => {
     $("profilePhotoPreview").innerHTML = `<img src="${dataUrl}">`;
   });
 });
+
+// ---------- tap current avatar → preview with "change" / "back" ----------
+function openAvatarPreview(dataUrl, onChange) {
+  if (!dataUrl) { onChange(); return; }
+  $("avatarPreviewImg").src = dataUrl;
+  $("avatarPreviewOverlay").classList.remove("hidden");
+  $("avatarPreviewChangeBtn").onclick = () => {
+    $("avatarPreviewOverlay").classList.add("hidden");
+    onChange();
+  };
+}
+$("avatarPreviewBackBtn").addEventListener("click", () => $("avatarPreviewOverlay").classList.add("hidden"));
+
+$("regPhotoPreview").addEventListener("click", () => {
+  openAvatarPreview(regPhotoData, () => $("regPhotoFile").click());
+});
+$("profilePhotoPreview").addEventListener("click", () => {
+  openAvatarPreview(settingsPhotoData || (profile && profile.photo_url), () => $("settingsPhotoFile").click());
+});
+
+// ---------- Settings: open/close the Profile Edit sheet ----------
+$("openProfileEditRow").addEventListener("click", () => $("profileEditOverlay").classList.remove("hidden"));
+$("profileEditCloseBtn").addEventListener("click", () => $("profileEditOverlay").classList.add("hidden"));
 
 // ============================================================
 // Google Sign-In (optional — persists profile across devices)
@@ -618,6 +644,8 @@ function fillSettingsForm() {
   $("settingsPhone").value = profile.phone || "";
   $("settingsWhatsapp").value = profile.whatsapp || "";
   if (profile.photo_url) $("profilePhotoPreview").innerHTML = `<img src="${profile.photo_url}">`;
+  $("profileSummaryAvatar").innerHTML = profile.photo_url ? `<img src="${profile.photo_url}">` : "👤";
+  $("profileSummaryName").textContent = profile.name || "";
   settingsSelectedPositions = (profile.positions || []).slice();
   renderPositionPickers();
   $("settingsLevel").value = profile.level || "";
@@ -639,7 +667,10 @@ $("saveProfileBtn").addEventListener("click", async () => {
     setLocalProfile(profile);
     profilesById[profile.id] = profile;
     $("userGreeting").textContent = t("greeting", profile.name);
+    $("profileSummaryAvatar").innerHTML = profile.photo_url ? `<img src="${profile.photo_url}">` : "👤";
+    $("profileSummaryName").textContent = profile.name || "";
     toast(t("toastSaveOk"));
+    $("profileEditOverlay").classList.add("hidden");
   } catch (err) {
     console.error(err);
     toast(t("toastSaveFailed"));
