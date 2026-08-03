@@ -530,7 +530,8 @@ html[data-theme="night"] .msg-quote .qname { color: var(--gold); }
 .cropper-viewport {
   width: 220px; height: 220px; margin: 0 auto 14px; border-radius: 50%;
   overflow: hidden; position: relative; background: var(--card);
-  border: 3px dashed var(--pitch-line); touch-action: none; cursor: grab;
+  border: 3px solid var(--gold); touch-action: none; cursor: grab;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.6);
 }
 .cropper-viewport img {
   position: absolute; top: 50%; left: 50%; max-width: none;
