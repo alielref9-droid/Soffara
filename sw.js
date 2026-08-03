@@ -1,13 +1,13 @@
 // Service worker بسيط: بيكاش الـ app shell عشان التطبيق يفتح حتى من غير نت
 // (البيانات نفسها - الحجوزات والدردشة - محتاجة نت عشان تتحدث زي ما اتطلب)
-const CACHE_NAME = "soffara-shell-v1";
+const CACHE_NAME = "soffara-shell-v2";
 const SHELL_FILES = [
   "./",
   "./index.html",
-  "./style.css",
-  "./app.js",
-  "./i18n.js",
-  "./config.js",
+  "./style.css?v=2",
+  "./app.js?v=2",
+  "./i18n.js?v=2",
+  "./config.js?v=2",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",

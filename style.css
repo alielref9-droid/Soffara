@@ -525,8 +525,6 @@ html[data-theme="night"] .msg-quote .qname { color: var(--gold); }
 .btn-google.linked {
   background: rgba(46,139,87,0.12); border-color: var(--green-ok); color: var(--green-ok); cursor: default;
 }
-  width: 46px; height: 34px; border: none; border-radius: 8px; background: none; cursor: pointer;
-}
 
 /* ===================== Photo cropper ===================== */
 .cropper-viewport {
