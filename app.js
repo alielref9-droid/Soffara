@@ -170,6 +170,7 @@ function applyTheme(name) {
       if (inputId === "customTextColor") document.documentElement.style.removeProperty("--ink-soft");
     }
   });
+  updateSettingsRowValues();
 }
 document.querySelectorAll(".theme-swatch").forEach((btn) => {
   btn.addEventListener("click", () => applyTheme(btn.dataset.theme));
@@ -364,6 +365,29 @@ $("profilePhotoPreview").addEventListener("click", () => {
 // ---------- Settings: open/close the Profile Edit sheet ----------
 $("openProfileEditRow").addEventListener("click", () => $("profileEditOverlay").classList.remove("hidden"));
 $("profileEditCloseBtn").addEventListener("click", () => $("profileEditOverlay").classList.add("hidden"));
+
+$("openThemeRow").addEventListener("click", () => $("themeOverlay").classList.remove("hidden"));
+$("themeCloseBtn").addEventListener("click", () => $("themeOverlay").classList.add("hidden"));
+
+$("openLanguageRow").addEventListener("click", () => $("languageOverlay").classList.remove("hidden"));
+$("languageCloseBtn").addEventListener("click", () => $("languageOverlay").classList.add("hidden"));
+
+$("openAdminRow").addEventListener("click", () => $("adminOverlay").classList.remove("hidden"));
+$("adminCloseBtn").addEventListener("click", () => $("adminOverlay").classList.add("hidden"));
+
+$("openNotificationsRow").addEventListener("click", () => $("notificationsOverlay").classList.remove("hidden"));
+$("notifCloseBtn").addEventListener("click", () => $("notificationsOverlay").classList.add("hidden"));
+
+$("openAboutRow").addEventListener("click", () => $("aboutOverlay").classList.remove("hidden"));
+$("aboutCloseBtn").addEventListener("click", () => $("aboutOverlay").classList.add("hidden"));
+
+function updateSettingsRowValues() {
+  const themeNames = { pitch: t("themePitch"), night: t("themeNight"), day: t("themeDay"), custom: t("themeCustom") };
+  const currentTheme = localStorage.getItem("soffara_theme") || "pitch";
+  $("themeRowValue").textContent = themeNames[currentTheme] || "";
+  $("languageRowValue").textContent = getLang() === "ar" ? "العربية" : "English";
+  $("adminRowValue").textContent = (profile && profile.is_admin) ? t("adminBadge") : "";
+}
 
 // ============================================================
 // Google Sign-In (optional — persists profile across devices)
@@ -589,7 +613,7 @@ $("rejoinCloseBtn").addEventListener("click", () => {
 
 let rejoinRequestsCache = [];
 function renderRejoinRequests() {
-  $("rejoinRequestsCard").classList.toggle("hidden", !(profile && profile.is_admin) || !rejoinRequestsCache.length);
+  $("rejoinRequestsSection").classList.toggle("hidden", !(profile && profile.is_admin) || !rejoinRequestsCache.length);
   const list = $("rejoinRequestsList");
   if (!list) return;
   list.innerHTML = rejoinRequestsCache.map((r) => `
@@ -703,6 +727,7 @@ function reflectAdminUI() {
   $("fabNewBooking").classList.toggle("hidden", !(isAdmin && !$("view-bookings").classList.contains("hidden")));
   renderBannedList();
   renderRejoinRequests();
+  updateSettingsRowValues();
 }
 
 // ============================================================
@@ -805,7 +830,7 @@ async function kickMember(p) {
 
 let bannedCache = [];
 function renderBannedList() {
-  $("bannedCard").classList.toggle("hidden", !(profile && profile.is_admin));
+  $("bannedSection").classList.toggle("hidden", !(profile && profile.is_admin));
   const list = $("bannedList");
   if (!list) return;
   if (!bannedCache.length) {
