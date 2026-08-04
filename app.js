@@ -226,6 +226,7 @@ function showView(name) {
   $("fabNewBooking").classList.toggle("hidden", !(name === "bookings" && profile && profile.is_admin));
   $("fabNewMemory").classList.toggle("hidden", !(name === "memories" && profile && profile.is_admin));
   if (name === "chat") scrollChatToBottom();
+  if (name === "settings") hideSettingsSubpages();
   if (name === "bookings" || name === "chat") {
     setLastSeen(name);
     updateBadges();
@@ -363,23 +364,33 @@ $("profilePhotoPreview").addEventListener("click", () => {
 });
 
 // ---------- Settings: open/close the Profile Edit sheet ----------
-$("openProfileEditRow").addEventListener("click", () => $("profileEditOverlay").classList.remove("hidden"));
-$("profileEditCloseBtn").addEventListener("click", () => $("profileEditOverlay").classList.add("hidden"));
+const SETTINGS_SUBPAGES = ["settingsSubProfile", "settingsSubTheme", "settingsSubLanguage", "settingsSubAdmin", "settingsSubNotifications", "settingsSubAbout"];
+function showSettingsSubpage(id) {
+  $("settingsListWrap").classList.add("hidden");
+  SETTINGS_SUBPAGES.forEach((sid) => $(sid).classList.toggle("hidden", sid !== id));
+}
+function hideSettingsSubpages() {
+  SETTINGS_SUBPAGES.forEach((sid) => $(sid).classList.add("hidden"));
+  $("settingsListWrap").classList.remove("hidden");
+}
 
-$("openThemeRow").addEventListener("click", () => $("themeOverlay").classList.remove("hidden"));
-$("themeCloseBtn").addEventListener("click", () => $("themeOverlay").classList.add("hidden"));
+$("openProfileEditRow").addEventListener("click", () => showSettingsSubpage("settingsSubProfile"));
+$("profileEditBackBtn").addEventListener("click", hideSettingsSubpages);
 
-$("openLanguageRow").addEventListener("click", () => $("languageOverlay").classList.remove("hidden"));
-$("languageCloseBtn").addEventListener("click", () => $("languageOverlay").classList.add("hidden"));
+$("openThemeRow").addEventListener("click", () => showSettingsSubpage("settingsSubTheme"));
+$("themeBackBtn").addEventListener("click", hideSettingsSubpages);
 
-$("openAdminRow").addEventListener("click", () => $("adminOverlay").classList.remove("hidden"));
-$("adminCloseBtn").addEventListener("click", () => $("adminOverlay").classList.add("hidden"));
+$("openLanguageRow").addEventListener("click", () => showSettingsSubpage("settingsSubLanguage"));
+$("languageBackBtn").addEventListener("click", hideSettingsSubpages);
 
-$("openNotificationsRow").addEventListener("click", () => $("notificationsOverlay").classList.remove("hidden"));
-$("notifCloseBtn").addEventListener("click", () => $("notificationsOverlay").classList.add("hidden"));
+$("openAdminRow").addEventListener("click", () => showSettingsSubpage("settingsSubAdmin"));
+$("adminBackBtn").addEventListener("click", hideSettingsSubpages);
 
-$("openAboutRow").addEventListener("click", () => $("aboutOverlay").classList.remove("hidden"));
-$("aboutCloseBtn").addEventListener("click", () => $("aboutOverlay").classList.add("hidden"));
+$("openNotificationsRow").addEventListener("click", () => showSettingsSubpage("settingsSubNotifications"));
+$("notifBackBtn").addEventListener("click", hideSettingsSubpages);
+
+$("openAboutRow").addEventListener("click", () => showSettingsSubpage("settingsSubAbout"));
+$("aboutBackBtn").addEventListener("click", hideSettingsSubpages);
 
 function updateSettingsRowValues() {
   const themeNames = { pitch: t("themePitch"), night: t("themeNight"), day: t("themeDay"), custom: t("themeCustom") };
@@ -694,7 +705,7 @@ $("saveProfileBtn").addEventListener("click", async () => {
     $("profileSummaryAvatar").innerHTML = profile.photo_url ? `<img src="${profile.photo_url}">` : "👤";
     $("profileSummaryName").textContent = profile.name || "";
     toast(t("toastSaveOk"));
-    $("profileEditOverlay").classList.add("hidden");
+    hideSettingsSubpages();
   } catch (err) {
     console.error(err);
     toast(t("toastSaveFailed"));
@@ -1279,19 +1290,53 @@ function renderMessages(msgs) {
     const quoteHtml = m.reply_to
       ? `<div class="msg-quote"><span class="qname">${escapeHtml(m.reply_to.name)}</span><span class="qtext">${escapeHtml(m.reply_to.text)}</span></div>`
       : "";
+    const isPinned = pinnedMessageId === m.id;
+    const pinnedTagHtml = isPinned ? `<div class="msg-pinned-tag">📌 ${t("pinnedTag")}</div>` : "";
+    const adminMenuHtml = (profile && profile.is_admin) ? `
+      <button class="msg-menu-btn" data-menu-toggle="${m.id}">⋮</button>
+      <div class="msg-menu-actions" id="menu-${m.id}">
+        <button data-pin-msg="${m.id}">${isPinned ? t("unpinBtn") : t("pinBtn")}</button>
+        <button data-delete-msg="${m.id}">${t("deleteMsgBtn")}</button>
+      </div>` : "";
     parts.push(`
       <div class="msg-with-avatar ${mine ? "mine" : ""}" data-msgid="${m.id}" data-sender="${m.profile_id}" data-sendername="${escapeHtml(p.name || "?")}" data-text="${escapeHtml(m.content)}">
         <span class="msg-avatar-tap" data-profile-tap="${m.profile_id}">${avatarHtml(p, "avatar-img")}</span>
         <div class="msg-col">
           <div class="msg-name" data-profile-tap="${m.profile_id}">${escapeHtml(p.name || "?")}</div>
+          ${pinnedTagHtml}
           <div class="msg-bubble">${quoteHtml}${escapeHtml(m.content)}</div>
           <div class="msg-time">${timeStr}</div>
+          ${adminMenuHtml}
         </div>
       </div>`);
   });
   log.innerHTML = parts.join("");
   log.querySelectorAll("[data-profile-tap]").forEach((el) => {
     el.addEventListener("click", (e) => { e.stopPropagation(); openProfileView(el.dataset.profileTap); });
+  });
+  log.querySelectorAll("[data-menu-toggle]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const menu = $(`menu-${btn.dataset.menuToggle}`);
+      const wasOpen = menu.classList.contains("open");
+      log.querySelectorAll(".msg-menu-actions.open").forEach((m) => m.classList.remove("open"));
+      if (!wasOpen) menu.classList.add("open");
+    });
+  });
+  log.querySelectorAll("[data-pin-msg]").forEach((btn) => {
+    btn.addEventListener("click", (e) => { e.stopPropagation(); togglePinMessage(btn.dataset.pinMsg); });
+  });
+  log.querySelectorAll("[data-delete-msg]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (btn.dataset.confirming === "1") {
+        deleteMessage(btn.dataset.deleteMsg);
+      } else {
+        btn.dataset.confirming = "1";
+        btn.textContent = t("confirmDeleteMsgInline");
+        setTimeout(() => { btn.dataset.confirming = ""; btn.textContent = t("deleteMsgBtn"); }, 4000);
+      }
+    });
   });
   setupSwipeToReply(log);
   scrollChatToBottom();
@@ -1342,6 +1387,55 @@ function setupSwipeToReply(log) {
     el.addEventListener("pointercancel", onUp);
   });
 }
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".msg-menu-btn") && !e.target.closest(".msg-menu-actions")) {
+    document.querySelectorAll(".msg-menu-actions.open").forEach((m) => m.classList.remove("open"));
+  }
+});
+
+// ---------- pin / delete message (admin only) ----------
+let pinnedMessageId = null;
+function renderPinnedBanner(data) {
+  pinnedMessageId = data ? data.message_id : null;
+  const banner = $("pinnedBanner");
+  if (!data) { banner.classList.add("hidden"); return; }
+  banner.classList.remove("hidden");
+  $("pinnedBannerName").textContent = data.sender_name || "";
+  $("pinnedBannerContent").textContent = data.content || "";
+  $("pinnedUnpinBtn").classList.toggle("hidden", !(profile && profile.is_admin));
+}
+$("pinnedUnpinBtn").addEventListener("click", async () => {
+  try { await db.collection("chat_meta").doc("pinned").delete(); } catch (err) { console.error(err); }
+});
+async function togglePinMessage(id) {
+  try {
+    if (pinnedMessageId === id) {
+      await db.collection("chat_meta").doc("pinned").delete();
+    } else {
+      const m = chatMessagesCache.find((x) => x.id === id);
+      if (!m) return;
+      const p = profilesById[m.profile_id] || {};
+      await db.collection("chat_meta").doc("pinned").set({
+        message_id: id, content: m.content, sender_name: p.name || "?",
+        pinned_by: profile.id, pinned_at: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+    renderMessages(chatMessagesCache);
+  } catch (err) {
+    console.error(err);
+    toast(t("toastKickFailed"));
+  }
+}
+async function deleteMessage(id) {
+  try {
+    await db.collection("messages").doc(id).delete();
+    if (pinnedMessageId === id) await db.collection("chat_meta").doc("pinned").delete().catch(() => {});
+  } catch (err) {
+    console.error(err);
+    toast(t("toastKickFailed"));
+  }
+}
+
 async function sendMessage() {
   const input = $("chatInput");
   const content = input.value.trim();
@@ -1442,6 +1536,11 @@ function setupRealtime() {
 
   db.collection("typing").onSnapshot((snap) => {
     renderTyping(snap.docs);
+  }, (err) => console.error(err));
+
+  db.collection("chat_meta").doc("pinned").onSnapshot((doc) => {
+    renderPinnedBanner(doc.exists ? doc.data() : null);
+    renderMessages(chatMessagesCache);
   }, (err) => console.error(err));
 }
 
