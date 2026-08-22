@@ -214,7 +214,62 @@ function updateBadges() {
 $("muteChatToggle").addEventListener("change", (e) => {
   localStorage.setItem("soffara_chat_muted", e.target.checked ? "1" : "0");
   updateBadges();
+  if (profile) db.collection("profiles").doc(profile.id).update({ chat_muted: e.target.checked }).catch(() => {});
 });
+
+// ============================================================
+// Push notifications (Firebase Cloud Messaging)
+// ============================================================
+let messaging = null;
+try { messaging = firebase.messaging(); } catch (err) { console.warn("Messaging not supported", err); }
+
+function reflectPushUI() {
+  const btn = $("pushEnableBtn");
+  if (!btn) return;
+  const supported = !!messaging && "Notification" in window;
+  if (!supported) {
+    btn.textContent = t("pushNotSupported");
+    btn.disabled = true;
+    return;
+  }
+  if (Notification.permission === "granted" && profile && profile.fcm_token) {
+    btn.textContent = t("pushEnabledBtn");
+    btn.disabled = true;
+    btn.classList.add("linked");
+  } else if (Notification.permission === "denied") {
+    btn.textContent = t("pushDeniedBtn");
+    btn.disabled = true;
+  } else {
+    btn.textContent = t("pushEnableBtn");
+    btn.disabled = false;
+    btn.classList.remove("linked");
+  }
+}
+$("pushEnableBtn") && $("pushEnableBtn").addEventListener("click", async () => {
+  if (!messaging) return;
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") { toast(t("toastPushDenied")); reflectPushUI(); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const token = await messaging.getToken({ vapidKey: CFG.VAPID_KEY, serviceWorkerRegistration: reg });
+    if (token && profile) {
+      await db.collection("profiles").doc(profile.id).update({ fcm_token: token });
+      profile.fcm_token = token;
+      setLocalProfile(profile);
+      toast(t("toastPushEnabled"));
+    }
+    reflectPushUI();
+  } catch (err) {
+    console.error(err);
+    toast(t("toastPushFailed"));
+  }
+});
+if (messaging) {
+  messaging.onMessage((payload) => {
+    const body = (payload.notification && payload.notification.body) || (payload.data && payload.data.body) || "";
+    if (body) toast(body);
+  });
+}
 
 function showView(name) {
   ["bookings", "chat", "memories", "crew", "settings"].forEach((v) => {
@@ -686,6 +741,7 @@ function fillSettingsForm() {
   $("settingsLevel").value = profile.level || "";
   reflectGoogleLinkUI();
   $("muteChatToggle").checked = isChatMuted();
+  reflectPushUI();
 }
 $("saveProfileBtn").addEventListener("click", async () => {
   const updates = {

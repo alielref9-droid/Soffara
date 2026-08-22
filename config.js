@@ -3,7 +3,7 @@
 // (من: Project settings > عمومي > انزل لتحت لـ "التطبيقات" > Web app > SDK setup and configuration)
 // هتلاقي هناك بلوك جاهز اسمه firebaseConfig، انسخه كله والصقه بدل اللي تحت
 // ============================================================
-window.SOFFARA_CONFIG = {
+self.SOFFARA_CONFIG = {
   firebaseConfig: {
     apiKey: "AIzaSyB1ZOApVMA4Ywi7OamvIuH9l_Bs4sBQwD4",
     authDomain: "soffara-6b51f.firebaseapp.com",
@@ -17,4 +17,7 @@ window.SOFFARA_CONFIG = {
   ADMIN_CODE: "M3ss!10B@rca",
 
   APP_NAME: "صفارة",
+
+  // مفتاح الإشعارات (Web Push certificate) من Firebase Console > Cloud Messaging
+  VAPID_KEY: "BEtimJvb38bkOp88cKZMby6UmkpwTKpobUqVQN2mu2ZnnMZpopbp76uaqemKjqcXLOKXzoOZi6h3Shah0oi0q9A",
 };

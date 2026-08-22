@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="صفارة">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 <div id="app">
@@ -231,6 +231,10 @@
     <div class="settings-subpage hidden" id="settingsSubNotifications">
       <div class="subpage-header"><button class="subpage-back" id="notifBackBtn">‹</button><span data-i18n="notifHeading">الإشعارات</span></div>
       <div class="subpage-body">
+        <div class="mute-row" id="pushEnableRow">
+          <span data-i18n="pushEnableLabel">تفعيل الإشعارات</span>
+          <button class="btn-secondary" id="pushEnableBtn" data-i18n="pushEnableBtn">تفعيل</button>
+        </div>
         <div class="mute-row">
           <span data-i18n="muteChatLabel">كتم إشعارات الدردشة</span>
           <label class="switch">
@@ -427,8 +431,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="config.js?v=6"></script>
-<script src="i18n.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+<script src="config.js?v=7"></script>
+<script src="i18n.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
