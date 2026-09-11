@@ -17,6 +17,27 @@ function t(key, ...args) {
   if (typeof val === "function") return val(...args);
   return val !== undefined ? val : key;
 }
+
+// ============================================================
+// Back-navigation stack — makes the phone's hardware/nav-bar
+// back button close the current in-app layer (subpage/overlay)
+// instead of exiting the whole app.
+// ============================================================
+let closeableStack = [];
+function pushCloseable(closeFn) {
+  closeableStack.push(closeFn);
+  history.pushState({ soffaraLayer: closeableStack.length }, "");
+}
+window.addEventListener("popstate", () => {
+  const fn = closeableStack.pop();
+  if (fn) fn();
+});
+function closeLayer() {
+  // Used by in-app back/close/cancel buttons — routes through the same
+  // history.back() path as the hardware back button so the stack never
+  // gets out of sync between the two.
+  if (closeableStack.length > 0) history.back();
+}
 function applyStaticI18n() {
   const lang = getLang();
   const dict = window.SOFFARA_I18N[lang];
@@ -313,6 +334,7 @@ function openCropper(file, onConfirm) {
         fitCropperImage();
         $("cropperZoom").value = 1;
         $("cropperOverlay").classList.remove("hidden");
+        pushCloseable(() => $("cropperOverlay").classList.add("hidden"));
       };
       img.src = reader.result;
     };
@@ -354,7 +376,7 @@ $("cropperZoom").addEventListener("input", (e) => {
   window.addEventListener("pointermove", (e) => move(e.clientX, e.clientY));
   window.addEventListener("pointerup", end);
 })();
-$("cropperCancelBtn").addEventListener("click", () => $("cropperOverlay").classList.add("hidden"));
+$("cropperCancelBtn").addEventListener("click", closeLayer);
 $("cropperConfirmBtn").addEventListener("click", () => {
   const OUT = 480;
   const canvas = document.createElement("canvas");
@@ -380,7 +402,7 @@ $("cropperConfirmBtn").addEventListener("click", () => {
   } else if (cropperState.onConfirm) {
     cropperState.onConfirm(dataUrl);
   }
-  $("cropperOverlay").classList.add("hidden");
+  closeLayer();
 });
 
 $("regPhotoChooseBtn").addEventListener("click", () => $("regPhotoFile").click());
@@ -404,12 +426,13 @@ function openAvatarPreview(dataUrl, onChange) {
   if (!dataUrl) { onChange(); return; }
   $("avatarPreviewImg").src = dataUrl;
   $("avatarPreviewOverlay").classList.remove("hidden");
+  pushCloseable(() => $("avatarPreviewOverlay").classList.add("hidden"));
   $("avatarPreviewChangeBtn").onclick = () => {
-    $("avatarPreviewOverlay").classList.add("hidden");
+    closeLayer();
     onChange();
   };
 }
-$("avatarPreviewBackBtn").addEventListener("click", () => $("avatarPreviewOverlay").classList.add("hidden"));
+$("avatarPreviewBackBtn").addEventListener("click", closeLayer);
 
 $("regPhotoPreview").addEventListener("click", () => {
   openAvatarPreview(regPhotoData, () => $("regPhotoFile").click());
@@ -423,6 +446,7 @@ const SETTINGS_SUBPAGES = ["settingsSubProfile", "settingsSubTheme", "settingsSu
 function showSettingsSubpage(id) {
   $("settingsListWrap").classList.add("hidden");
   SETTINGS_SUBPAGES.forEach((sid) => $(sid).classList.toggle("hidden", sid !== id));
+  pushCloseable(hideSettingsSubpages);
 }
 function hideSettingsSubpages() {
   SETTINGS_SUBPAGES.forEach((sid) => $(sid).classList.add("hidden"));
@@ -430,22 +454,22 @@ function hideSettingsSubpages() {
 }
 
 $("openProfileEditRow").addEventListener("click", () => showSettingsSubpage("settingsSubProfile"));
-$("profileEditBackBtn").addEventListener("click", hideSettingsSubpages);
+$("profileEditBackBtn").addEventListener("click", closeLayer);
 
 $("openThemeRow").addEventListener("click", () => showSettingsSubpage("settingsSubTheme"));
-$("themeBackBtn").addEventListener("click", hideSettingsSubpages);
+$("themeBackBtn").addEventListener("click", closeLayer);
 
 $("openLanguageRow").addEventListener("click", () => showSettingsSubpage("settingsSubLanguage"));
-$("languageBackBtn").addEventListener("click", hideSettingsSubpages);
+$("languageBackBtn").addEventListener("click", closeLayer);
 
 $("openAdminRow").addEventListener("click", () => showSettingsSubpage("settingsSubAdmin"));
-$("adminBackBtn").addEventListener("click", hideSettingsSubpages);
+$("adminBackBtn").addEventListener("click", closeLayer);
 
 $("openNotificationsRow").addEventListener("click", () => showSettingsSubpage("settingsSubNotifications"));
-$("notifBackBtn").addEventListener("click", hideSettingsSubpages);
+$("notifBackBtn").addEventListener("click", closeLayer);
 
 $("openAboutRow").addEventListener("click", () => showSettingsSubpage("settingsSubAbout"));
-$("aboutBackBtn").addEventListener("click", hideSettingsSubpages);
+$("aboutBackBtn").addEventListener("click", closeLayer);
 
 function updateSettingsRowValues() {
   const themeNames = { pitch: t("themePitch"), night: t("themeNight"), day: t("themeDay"), custom: t("themeCustom") };
@@ -872,8 +896,9 @@ async function openProfileView(profileId) {
   } : null;
 
   $("profileViewOverlay").classList.remove("hidden");
+  pushCloseable(() => $("profileViewOverlay").classList.add("hidden"));
 }
-$("profileViewCloseBtn").addEventListener("click", () => $("profileViewOverlay").classList.add("hidden"));
+$("profileViewCloseBtn").addEventListener("click", closeLayer);
 
 async function kickMember(p) {
   try {
@@ -924,8 +949,11 @@ async function unbanMember(banId) {
 }
 
 
-$("openNewBookingBtn").addEventListener("click", () => $("newBookingOverlay").classList.remove("hidden"));
-$("cancelNewBookingBtn").addEventListener("click", () => $("newBookingOverlay").classList.add("hidden"));
+$("openNewBookingBtn").addEventListener("click", () => {
+  $("newBookingOverlay").classList.remove("hidden");
+  pushCloseable(() => $("newBookingOverlay").classList.add("hidden"));
+});
+$("cancelNewBookingBtn").addEventListener("click", closeLayer);
 
 function normalizeDigits(str) {
   const eastern = "٠١٢٣٤٥٦٧٨٩";
@@ -1117,8 +1145,9 @@ async function openDrawView(bookingId) {
   drawCustomSelection = new Set();
   await loadAndRenderDraw();
   $("drawOverlay").classList.remove("hidden");
+  pushCloseable(() => $("drawOverlay").classList.add("hidden"));
 }
-$("drawCloseBtn").addEventListener("click", () => $("drawOverlay").classList.add("hidden"));
+$("drawCloseBtn").addEventListener("click", closeLayer);
 
 async function loadAndRenderDraw() {
   const doc = await db.collection("draws").doc(drawBookingId).get();
@@ -1232,8 +1261,9 @@ $("openNewMemoryBtn").addEventListener("click", () => {
   $("memoryDateInput").value = new Date().toISOString().slice(0, 10);
   updateMemoryPreviewText();
   $("newMemoryOverlay").classList.remove("hidden");
+  pushCloseable(() => $("newMemoryOverlay").classList.add("hidden"));
 });
-$("cancelNewMemoryBtn").addEventListener("click", () => $("newMemoryOverlay").classList.add("hidden"));
+$("cancelNewMemoryBtn").addEventListener("click", closeLayer);
 $("memoryCameraBtn").addEventListener("click", () => $("memoryPhotoFileCamera").click());
 $("memoryUploadBtn").addEventListener("click", () => $("memoryPhotoFileUpload").click());
 function fileToDataUrl(file, cb) {
