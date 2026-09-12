@@ -472,7 +472,7 @@ $("openAboutRow").addEventListener("click", () => showSettingsSubpage("settingsS
 $("aboutBackBtn").addEventListener("click", closeLayer);
 
 function updateSettingsRowValues() {
-  const themeNames = { pitch: t("themePitch"), night: t("themeNight"), day: t("themeDay"), custom: t("themeCustom") };
+  const themeNames = { pitch: t("themePitch"), night: t("themeNight"), day: t("themeDay"), blue_lock: t("themeBlueLock"), custom: t("themeCustom") };
   const currentTheme = localStorage.getItem("soffara_theme") || "pitch";
   $("themeRowValue").textContent = themeNames[currentTheme] || "";
   $("languageRowValue").textContent = getLang() === "ar" ? "العربية" : "English";
@@ -562,6 +562,21 @@ async function completeGoogleFlow(intent, user) {
       profilesById[profile.id] = profile;
       $("registerOverlay").classList.add("hidden");
       bootAfterAuth();
+      enablePushNotifications(true);
+    } else if (intent === "login") {
+      const snap = await db.collection("profiles").where("auth_uid", "==", user.uid).limit(1).get();
+      if (snap.empty) {
+        toast(t("toastAccountNotFound"));
+        return;
+      }
+      const doc = snap.docs[0];
+      await db.collection("profiles").doc(doc.id).update({ device_id: getDeviceId() });
+      profile = { id: doc.id, ...doc.data(), device_id: getDeviceId() };
+      setLocalProfile(profile);
+      profilesById[profile.id] = profile;
+      $("registerOverlay").classList.add("hidden");
+      bootAfterAuth();
+      enablePushNotifications(true);
     } else if (intent === "link" && profile) {
       const updates = { auth_uid: user.uid, auth_email: user.email || null };
       await db.collection("profiles").doc(profile.id).update(updates);
@@ -624,6 +639,44 @@ async function isBanned({ deviceId, phone, whatsapp, email }) {
   return results.some((snap) => !snap.empty);
 }
 
+// ---------- register vs. login-to-existing-account toggle ----------
+$("regModeNewBtn").addEventListener("click", () => {
+  $("regModeNewBtn").classList.add("active");
+  $("regModeLoginBtn").classList.remove("active");
+  $("regNewForm").classList.remove("hidden");
+  $("regLoginForm").classList.add("hidden");
+});
+$("regModeLoginBtn").addEventListener("click", () => {
+  $("regModeLoginBtn").classList.add("active");
+  $("regModeNewBtn").classList.remove("active");
+  $("regLoginForm").classList.remove("hidden");
+  $("regNewForm").classList.add("hidden");
+});
+$("loginBtn").addEventListener("click", async () => {
+  const phone = $("loginPhone").value.trim();
+  if (!phone) return toast(t("toastNeedPhone"));
+  try {
+    const snap = await db.collection("profiles").where("phone", "==", phone).limit(1).get();
+    if (snap.empty) return toast(t("toastAccountNotFound"));
+    const doc = snap.docs[0];
+    await db.collection("profiles").doc(doc.id).update({ device_id: getDeviceId() });
+    profile = { id: doc.id, ...doc.data(), device_id: getDeviceId() };
+    setLocalProfile(profile);
+    profilesById[profile.id] = profile;
+    $("registerOverlay").classList.add("hidden");
+    bootAfterAuth();
+    enablePushNotifications(true);
+  } catch (err) {
+    console.error(err);
+    toast(t("toastLoginFailed"));
+  }
+});
+$("googleLoginBtn2").addEventListener("click", () => {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  localStorage.setItem("soffara_google_intent", "login");
+  auth.signInWithRedirect(provider);
+});
+
 $("registerBtn").addEventListener("click", async () => {
   const name = $("regName").value.trim();
   if (!name) return toast(t("toastNeedName"));
@@ -649,6 +702,7 @@ $("registerBtn").addEventListener("click", async () => {
     setLocalProfile(profile);
     $("registerOverlay").classList.add("hidden");
     bootAfterAuth();
+    enablePushNotifications(true);
   } catch (err) {
     console.error(err);
     toast(t("toastRegFailed"));
@@ -683,6 +737,7 @@ async function submitRejoinRequest(payload) {
           rejoinListenerUnsub();
           $("rejoinWaitingOverlay").classList.add("hidden");
           bootAfterAuth();
+          enablePushNotifications(true);
         }
       } else if (data.status === "denied") {
         $("rejoinWaitingTitle").textContent = t("rejoinDeniedTitle");
@@ -1055,6 +1110,7 @@ async function renderBookings() {
           ${outList.length ? `<div class="vote-count" style="margin-top:8px">${t("notComingCountLabel", outList.length)}</div><div class="avatars">${chipRow(outList)}</div>` : ""}
           ${b.notes ? `<div class="vote-count" style="margin-top:8px">📝 ${escapeHtml(b.notes)}</div>` : ""}
           <button class="ticket-draw-btn" data-draw="${b.id}">🎲 ${t("drawBtn")}</button>
+          <button class="ticket-draw-btn" data-payments="${b.id}">💰 ${t("paymentsBtn")}</button>
         </div>
         ${profile?.is_admin ? `<div class="ticket-admin"><button class="link-danger" data-delete="${b.id}">${t("deleteBookingBtn")}</button></div>` : ""}
       </div>
@@ -1077,6 +1133,9 @@ async function renderBookings() {
   });
   list.querySelectorAll("[data-draw]").forEach((btn) => {
     btn.addEventListener("click", () => openDrawView(btn.dataset.draw));
+  });
+  list.querySelectorAll("[data-payments]").forEach((btn) => {
+    btn.addEventListener("click", () => openPaymentsView(btn.dataset.payments));
   });
 }
 
@@ -1234,6 +1293,118 @@ async function generateDraw() {
   } catch (err) {
     console.error(err);
     toast(t("toastKickFailed"));
+  }
+}
+
+// ============================================================
+// Payments (who paid, how much)
+// ============================================================
+let paymentsBookingId = null;
+let paymentsAddMode = null; // 'manual' | 'self'
+let paymentsCache = [];
+
+async function openPaymentsView(bookingId) {
+  paymentsBookingId = bookingId;
+  $("paymentsAddForm").classList.add("hidden");
+  $("paymentsQrBox").classList.add("hidden");
+  $("paymentsAdminActions").classList.toggle("hidden", !(profile && profile.is_admin));
+  await loadAndRenderPayments();
+  $("paymentsOverlay").classList.remove("hidden");
+  pushCloseable(() => $("paymentsOverlay").classList.add("hidden"));
+}
+$("paymentsCloseBtn").addEventListener("click", closeLayer);
+
+async function loadAndRenderPayments() {
+  const snap = await db.collection("payments").where("booking_id", "==", paymentsBookingId).get();
+  paymentsCache = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  renderPayments();
+}
+function renderPayments() {
+  const booking = bookingsCache.find((b) => b.id === paymentsBookingId);
+  const total = paymentsCache.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  $("paymentsSummary").innerHTML = `
+    <div><div class="ps-label">${t("totalPaidLabel")}</div><div class="ps-value">${total} ${t("egp")}</div></div>
+    <div><div class="ps-label">${t("bookingPriceLabel")}</div><div class="ps-value">${booking ? booking.price : "-"} ${t("egp")}</div></div>`;
+  const list = $("paymentsList");
+  if (!paymentsCache.length) {
+    list.innerHTML = `<div class="empty-state">${t("emptyPayments")}</div>`;
+  } else {
+    list.innerHTML = paymentsCache.map((p) => `
+      <div class="payment-row">
+        <span class="payment-row-name">${escapeHtml(p.name || "?")}</span>
+        <span>
+          <span class="payment-row-amount">${p.amount} ${t("egp")}</span>
+          ${profile?.is_admin ? `<button class="payment-delete-btn" data-pay-delete="${p.id}">${t("deleteBtn")}</button>` : ""}
+        </span>
+      </div>`).join("");
+    list.querySelectorAll("[data-pay-delete]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (btn.dataset.confirming === "1") {
+          deletePayment(btn.dataset.payDelete);
+        } else {
+          btn.dataset.confirming = "1";
+          btn.textContent = t("confirmDeleteInline");
+          setTimeout(() => { btn.dataset.confirming = ""; btn.textContent = t("deleteBtn"); }, 4000);
+        }
+      });
+    });
+  }
+}
+async function deletePayment(id) {
+  try {
+    await db.collection("payments").doc(id).delete();
+    await loadAndRenderPayments();
+  } catch (err) {
+    console.error(err);
+    toast(t("toastKickFailed"));
+  }
+}
+
+function openPayForm(mode) {
+  paymentsAddMode = mode;
+  $("paymentsQrBox").classList.add("hidden");
+  $("paymentsAddForm").classList.remove("hidden");
+  $("paymentNameField").classList.toggle("hidden", mode === "self");
+  $("paymentNameInput").value = mode === "self" ? (profile.name || "") : "";
+  $("paymentAmountInput").value = "";
+}
+$("paymentsIPaidBtn").addEventListener("click", () => openPayForm("self"));
+$("paymentsAddBtn").addEventListener("click", () => openPayForm("manual"));
+$("paymentSubmitBtn").addEventListener("click", async () => {
+  const amount = parseFloat(normalizeDigits($("paymentAmountInput").value));
+  if (Number.isNaN(amount)) return toast(t("toastNeedAmount"));
+  const name = paymentsAddMode === "self" ? profile.name : $("paymentNameInput").value.trim();
+  if (!name) return toast(t("toastNeedName"));
+  try {
+    await db.collection("payments").add({
+      booking_id: paymentsBookingId,
+      name,
+      amount,
+      profile_id: paymentsAddMode === "self" ? profile.id : null,
+      is_guest: paymentsAddMode !== "self",
+      marked_by: profile.id,
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    $("paymentsAddForm").classList.add("hidden");
+    toast(t("toastPaymentAdded"));
+    await loadAndRenderPayments();
+  } catch (err) {
+    console.error(err);
+    toast(t("toastKickFailed"));
+  }
+});
+$("paymentsQrBtn").addEventListener("click", () => {
+  $("paymentsAddForm").classList.add("hidden");
+  const url = `https://alielref9-droid.github.io/Soffara/?pay=${paymentsBookingId}`;
+  $("paymentsQrImg").src = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(url)}`;
+  $("paymentsQrBox").classList.remove("hidden");
+});
+function checkPayUrlParam() {
+  const params = new URLSearchParams(location.search);
+  const payId = params.get("pay");
+  if (payId && profile) {
+    history.replaceState({}, "", location.pathname);
+    openPaymentsView(payId).then(() => openPayForm("self"));
   }
 }
 

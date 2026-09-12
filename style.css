@@ -33,6 +33,20 @@ html[data-theme="day"] {
   --ink: #14261C;
 }
 
+html[data-theme="blue_lock"] {
+  --pitch-dark: #0A0E27;
+  --pitch: #10163D;
+  --pitch-line: rgba(0,217,255,0.18);
+  --chalk: #0D1526;
+  --card: #16213E;
+  --ink: #E8EEF7;
+  --ink-soft: #7C8DB5;
+  --gold: #00D9FF;
+  --red: #FF3860;
+  --green-ok: #2ECC71;
+  --shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+
 * { box-sizing: border-box; }
 .hidden { display: none !important; }
 html, body { height: 100%; }
@@ -233,7 +247,7 @@ button, input, textarea, select { font-family: inherit; }
 }
 .nav-btn .icon { font-size: 20px; }
 .nav-btn.active { color: var(--pitch-dark); }
-html[data-theme="night"] .nav-btn.active { color: var(--gold); }
+html[data-theme="night"] .nav-btn.active, html[data-theme="blue_lock"] .nav-btn.active { color: var(--gold); }
 
 /* ===================== Chat ===================== */
 .chat-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 16px 16px 0; }
@@ -440,10 +454,27 @@ html[dir="ltr"] .switch input:checked + .switch-slider::before { transform: tran
 .draw-team-member { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
 .draw-team-member .avatar-img, .draw-team-member .avatar-fallback { width: 26px; height: 26px; font-size: 11px; }
 .draw-meta { font-size: 11.5px; color: var(--ink-soft); text-align: center; margin-top: 10px; }
+
+/* Payments */
+.payments-summary {
+  background: var(--card); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;
+  display: flex; justify-content: space-between; align-items: center; box-shadow: var(--shadow);
+}
+.payments-summary .ps-label { font-size: 12px; color: var(--ink-soft); }
+.payments-summary .ps-value { font-family: var(--font-display); font-weight: 800; font-size: 16px; }
+.payment-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--card); border-radius: 10px; padding: 8px 12px; margin-bottom: 8px;
+}
+.payment-row-name { font-size: 13.5px; font-weight: 700; }
+.payment-row-amount { font-size: 13px; color: var(--green-ok); font-weight: 800; }
+.payment-delete-btn { background: none; border: none; color: var(--red); font-size: 11px; font-weight: 700; cursor: pointer; margin-inline-start: 8px; }
+.payments-add-form { background: var(--card); border-radius: 12px; padding: 14px; margin-top: 10px; }
+.payments-qr-box { text-align: center; margin-top: 10px; }
 .ticket-draw-btn {
   background: none; border: none; color: var(--pitch-dark); font-weight: 700; font-size: 12.5px; cursor: pointer;
 }
-html[data-theme="night"] .ticket-draw-btn { color: var(--gold); }
+html[data-theme="night"] .ticket-draw-btn, html[data-theme="blue_lock"] .ticket-draw-btn { color: var(--gold); }
 
 /* Crew (members) list */
 .crew-row {
@@ -481,7 +512,7 @@ html[data-theme="night"] .profile-view-row a.value { color: var(--gold); }
 }
 .reply-preview.hidden { display: none; }
 .reply-preview-name { font-size: 12px; font-weight: 800; color: var(--pitch-dark); }
-html[data-theme="night"] .reply-preview-name { color: var(--gold); }
+html[data-theme="night"] .reply-preview-name, html[data-theme="blue_lock"] .reply-preview-name { color: var(--gold); }
 .reply-preview-text { font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
 #replyPreviewCancel { background: none; border: none; font-size: 15px; color: var(--ink-soft); cursor: pointer; }
 .pinned-banner {
@@ -493,7 +524,7 @@ html[data-theme="night"] .reply-preview-name { color: var(--gold); }
 .pinned-icon { font-size: 15px; }
 .pinned-banner-text { flex: 1; min-width: 0; }
 .pinned-banner-name { font-size: 11.5px; font-weight: 800; color: var(--pitch-dark); }
-html[data-theme="night"] .pinned-banner-name { color: var(--gold); }
+html[data-theme="night"] .pinned-banner-name, html[data-theme="blue_lock"] .pinned-banner-name { color: var(--gold); }
 .pinned-banner-content { font-size: 12.5px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pinned-unpin-btn { background: none; border: none; color: var(--ink-soft); font-size: 14px; cursor: pointer; }
 .pinned-unpin-btn.hidden { display: none; }
@@ -585,6 +616,15 @@ html[data-theme="night"] .msg-quote .qname { color: var(--gold); }
 .color-field input[type="color"] {
   width: 44px; height: 32px; border-radius: 8px; border: 2px solid var(--pitch-line); padding: 0; background: none; cursor: pointer;
 }
+.reg-mode-row {
+  display: flex; gap: 8px; margin-bottom: 16px; background: var(--chalk);
+  border-radius: 12px; padding: 4px;
+}
+.reg-mode-btn {
+  flex: 1; background: none; border: none; padding: 9px; border-radius: 9px;
+  font-weight: 700; font-size: 13.5px; color: var(--ink-soft); cursor: pointer;
+}
+.reg-mode-btn.active { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
 .or-divider {
   text-align: center; color: var(--ink-soft); font-size: 12.5px; font-weight: 700;
   margin: 12px 0; position: relative;
