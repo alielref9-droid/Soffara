@@ -336,6 +336,9 @@ html[data-theme="night"] .nav-btn.active, html[data-theme="blue_lock"] .nav-btn.
 }
 .subpage-body { flex: 1; overflow-y: auto; padding-bottom: 100px; }
 
+.welcome-logo { display: flex; justify-content: center; margin: 10px 0 28px; }
+.welcome-logo img { width: 100%; max-width: 260px; height: auto; }
+
 .profile-summary-row {
   display: flex; align-items: center; gap: 12px; padding: 14px 16px;
 }

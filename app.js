@@ -640,18 +640,16 @@ async function isBanned({ deviceId, phone, whatsapp, email }) {
 }
 
 // ---------- register vs. login-to-existing-account toggle ----------
-$("regModeNewBtn").addEventListener("click", () => {
-  $("regModeNewBtn").classList.add("active");
-  $("regModeLoginBtn").classList.remove("active");
-  $("regNewForm").classList.remove("hidden");
-  $("regLoginForm").classList.add("hidden");
-});
-$("regModeLoginBtn").addEventListener("click", () => {
-  $("regModeLoginBtn").classList.add("active");
-  $("regModeNewBtn").classList.remove("active");
-  $("regLoginForm").classList.remove("hidden");
-  $("regNewForm").classList.add("hidden");
-});
+const REG_SCREENS = ["welcomeScreen", "regNewForm", "loginChoiceScreen", "regLoginForm"];
+function showRegScreen(id) {
+  REG_SCREENS.forEach((sid) => $(sid).classList.toggle("hidden", sid !== id));
+}
+$("welcomeCreateBtn").addEventListener("click", () => showRegScreen("regNewForm"));
+$("welcomeLoginBtn").addEventListener("click", () => showRegScreen("loginChoiceScreen"));
+$("regNewBackBtn").addEventListener("click", () => showRegScreen("welcomeScreen"));
+$("loginChoiceBackBtn").addEventListener("click", () => showRegScreen("welcomeScreen"));
+$("loginWithPhoneBtn").addEventListener("click", () => showRegScreen("regLoginForm"));
+$("regLoginBackBtn").addEventListener("click", () => showRegScreen("loginChoiceScreen"));
 $("loginBtn").addEventListener("click", async () => {
   const phone = $("loginPhone").value.trim();
   const pin = $("loginPin").value.trim();
@@ -760,6 +758,7 @@ async function submitRejoinRequest(payload) {
 $("rejoinCloseBtn").addEventListener("click", () => {
   if (rejoinListenerUnsub) rejoinListenerUnsub();
   $("rejoinWaitingOverlay").classList.add("hidden");
+  showRegScreen("welcomeScreen");
   $("registerOverlay").classList.remove("hidden");
 });
 
@@ -1835,6 +1834,7 @@ function bootAfterAuth() {
     $("registerOverlay").classList.add("hidden");
     bootAfterAuth();
   } else {
+    showRegScreen("welcomeScreen");
     $("registerOverlay").classList.remove("hidden");
   }
 
