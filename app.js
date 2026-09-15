@@ -654,10 +654,14 @@ $("regModeLoginBtn").addEventListener("click", () => {
 });
 $("loginBtn").addEventListener("click", async () => {
   const phone = $("loginPhone").value.trim();
+  const pin = $("loginPin").value.trim();
   if (!phone) return toast(t("toastNeedPhone"));
+  if (!pin) return toast(t("toastNeedPin"));
   try {
     const snap = await db.collection("profiles").where("phone", "==", phone).limit(1).get();
-    if (snap.empty) return toast(t("toastAccountNotFound"));
+    if (snap.empty || !snap.docs[0].data().pin || snap.docs[0].data().pin !== pin) {
+      return toast(t("toastLoginBadCreds"));
+    }
     const doc = snap.docs[0];
     await db.collection("profiles").doc(doc.id).update({ device_id: getDeviceId() });
     profile = { id: doc.id, ...doc.data(), device_id: getDeviceId() };
@@ -682,11 +686,14 @@ $("registerBtn").addEventListener("click", async () => {
   if (!name) return toast(t("toastNeedName"));
   const phone = $("regPhone").value.trim() || null;
   const whatsapp = $("regWhatsapp").value.trim() || null;
+  const pin = $("regPin").value.trim() || null;
+  if (phone && !pin) return toast(t("toastNeedPinForPhone"));
   const payload = {
     device_id: getDeviceId(),
     name,
     phone,
     whatsapp,
+    pin: phone ? pin : null,
     photo_url: regPhotoData,
     positions: regSelectedPositions.slice(),
     level: $("regLevel").value || null,
@@ -812,6 +819,7 @@ function fillSettingsForm() {
   $("settingsName").value = profile.name || "";
   $("settingsPhone").value = profile.phone || "";
   $("settingsWhatsapp").value = profile.whatsapp || "";
+  $("settingsPin").value = "";
   if (profile.photo_url) $("profilePhotoPreview").innerHTML = `<img src="${profile.photo_url}">`;
   $("profileSummaryAvatar").innerHTML = profile.photo_url ? `<img src="${profile.photo_url}">` : "👤";
   $("profileSummaryName").textContent = profile.name || "";
@@ -830,6 +838,8 @@ $("saveProfileBtn").addEventListener("click", async () => {
     positions: settingsSelectedPositions.slice(),
     level: $("settingsLevel").value || null,
   };
+  const newPin = $("settingsPin").value.trim();
+  if (newPin) updates.pin = newPin;
   if (settingsPhotoData) updates.photo_url = settingsPhotoData;
   try {
     await db.collection("profiles").doc(profile.id).update(updates);
