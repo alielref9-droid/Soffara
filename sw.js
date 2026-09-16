@@ -4,10 +4,10 @@ const CACHE_NAME = "soffara-shell-v7";
 const SHELL_FILES = [
   "./",
   "./index.html",
-  "./style.css?v=11",
-  "./app.js?v=11",
-  "./i18n.js?v=11",
-  "./config.js?v=11",
+  "./style.css?v=12",
+  "./app.js?v=12",
+  "./i18n.js?v=12",
+  "./config.js?v=12",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
@@ -17,7 +17,7 @@ const SHELL_FILES = [
 // ---------- Firebase Cloud Messaging: background notifications ----------
 importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js");
-importScripts("./config.js?v=11");
+importScripts("./config.js?v=12");
 try {
   firebase.initializeApp(self.SOFFARA_CONFIG.firebaseConfig);
   const messaging = firebase.messaging();

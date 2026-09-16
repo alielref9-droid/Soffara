@@ -338,6 +338,12 @@ html[data-theme="night"] .nav-btn.active, html[data-theme="blue_lock"] .nav-btn.
 
 .welcome-logo { display: flex; justify-content: center; margin: 10px 0 28px; }
 .welcome-logo img { width: 100%; max-width: 260px; height: auto; }
+.pin-field-row { display: flex; gap: 8px; }
+.pin-field-row input { flex: 1; }
+.pin-toggle-btn {
+  width: 44px; flex-shrink: 0; border-radius: 11px; border: 2px solid var(--pitch-line);
+  background: var(--card); font-size: 16px; cursor: pointer;
+}
 
 .profile-summary-row {
   display: flex; align-items: center; gap: 12px; padding: 14px 16px;

@@ -640,6 +640,14 @@ async function isBanned({ deviceId, phone, whatsapp, email }) {
 }
 
 // ---------- register vs. login-to-existing-account toggle ----------
+document.querySelectorAll("[data-pin-toggle]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const input = $(btn.dataset.pinToggle);
+    if (input.type === "password") { input.type = "text"; btn.textContent = "🙈"; }
+    else { input.type = "password"; btn.textContent = "👁️"; }
+  });
+});
+
 const REG_SCREENS = ["welcomeScreen", "regNewForm", "loginChoiceScreen", "regLoginForm"];
 function showRegScreen(id) {
   REG_SCREENS.forEach((sid) => $(sid).classList.toggle("hidden", sid !== id));
