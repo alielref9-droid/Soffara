@@ -4,6 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>صفارة</title>
+<script>
+(function () {
+  try {
+    var theme = localStorage.getItem("soffara_theme") || "pitch";
+    document.documentElement.setAttribute("data-theme", theme === "custom" ? "pitch" : theme);
+    if (theme === "custom") {
+      var map = { customBgColor: "--chalk", customCardColor: "--card", customHeaderColor: "--pitch-dark", customTextColor: "--ink", customAccentColor: "--gold" };
+      Object.keys(map).forEach(function (id) {
+        var v = localStorage.getItem("soffara_custom_" + id);
+        if (v) document.documentElement.style.setProperty(map[id], v);
+      });
+    }
+    var lang = localStorage.getItem("soffara_lang") || "ar";
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  } catch (e) {}
+})();
+</script>
+<style>html:not(.app-ready) body { visibility: hidden; }</style>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0F3D2E">
 <meta name="mobile-web-app-capable" content="yes">
@@ -11,9 +30,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="صفارة">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
+
 <div id="app">
 
   <!-- Top bar -->
@@ -503,8 +523,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
-<script src="config.js?v=12"></script>
-<script src="i18n.js?v=12"></script>
-<script src="app.js?v=12"></script>
+<script src="config.js?v=15"></script>
+<script src="i18n.js?v=15"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

@@ -24,13 +24,25 @@ function t(key, ...args) {
 // instead of exiting the whole app.
 // ============================================================
 let closeableStack = [];
+let exitArmed = false;
+let exitArmTimer = null;
 function pushCloseable(closeFn) {
   closeableStack.push(closeFn);
   history.pushState({ soffaraLayer: closeableStack.length }, "");
 }
 window.addEventListener("popstate", () => {
   const fn = closeableStack.pop();
-  if (fn) fn();
+  if (fn) {
+    fn();
+    return;
+  }
+  // Nothing left to close inside the app — this is an attempt to exit.
+  if (exitArmed) return; // second back press within the window: let it actually exit.
+  exitArmed = true;
+  toast(t("toastPressBackAgain"));
+  history.pushState({ soffaraExitGuard: true }, "");
+  clearTimeout(exitArmTimer);
+  exitArmTimer = setTimeout(() => { exitArmed = false; }, 2200);
 });
 function closeLayer() {
   // Used by in-app back/close/cancel buttons — routes through the same
@@ -308,8 +320,21 @@ function showView(name) {
     updateBadges();
   }
 }
+let tabBackPushed = false;
 document.querySelectorAll(".nav-btn").forEach((btn) => {
-  btn.addEventListener("click", () => showView(btn.dataset.view));
+  btn.addEventListener("click", () => {
+    const name = btn.dataset.view;
+    showView(name);
+    if (name === "bookings") {
+      tabBackPushed = false;
+    } else if (!tabBackPushed) {
+      tabBackPushed = true;
+      pushCloseable(() => {
+        tabBackPushed = false;
+        showView("bookings");
+      });
+    }
+  });
 });
 
 // ============================================================
@@ -350,8 +375,19 @@ function fitCropperImage() {
   cropperState.baseScale = scaleToCover;
   updateCropperTransform();
 }
+function clampCropperPosition() {
+  const vp = 220;
+  const totalScale = cropperState.baseScale * cropperState.scale;
+  const drawnW = cropperState.naturalW * totalScale;
+  const drawnH = cropperState.naturalH * totalScale;
+  const maxX = Math.max(0, (drawnW - vp) / 2);
+  const maxY = Math.max(0, (drawnH - vp) / 2);
+  cropperState.x = Math.min(maxX, Math.max(-maxX, cropperState.x));
+  cropperState.y = Math.min(maxY, Math.max(-maxY, cropperState.y));
+}
 function updateCropperTransform() {
   const img = $("cropperImg");
+  clampCropperPosition();
   const totalScale = cropperState.baseScale * cropperState.scale;
   img.style.width = `${cropperState.naturalW * totalScale}px`;
   img.style.height = `${cropperState.naturalH * totalScale}px`;
@@ -1829,6 +1865,7 @@ function bootAfterAuth() {
 }
 
 (function init() {
+  history.pushState({ soffaraBase: true }, "");
   applyStaticI18n();
   updateOnlineStatus();
   applyTheme(localStorage.getItem("soffara_theme") || "pitch");
@@ -1845,6 +1882,7 @@ function bootAfterAuth() {
     showRegScreen("welcomeScreen");
     $("registerOverlay").classList.remove("hidden");
   }
+  document.documentElement.classList.add("app-ready");
 
   handleGoogleRedirectResult();
 
